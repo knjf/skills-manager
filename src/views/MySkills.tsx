@@ -166,53 +166,6 @@ export function MySkills() {
     }
   };
 
-  const updateTone = (status: string) => {
-    switch (status) {
-      case "up_to_date":
-        return "text-emerald-400 bg-emerald-500/10";
-      case "update_available":
-        return "text-amber-300 bg-amber-500/10";
-      case "error":
-      case "source_missing":
-        return "text-red-300 bg-red-500/10";
-      case "updating":
-      case "checking":
-        return "text-sky-300 bg-sky-500/10";
-      default:
-        return "text-faint bg-surface-hover";
-    }
-  };
-
-  const updateLabel = (skill: ManagedSkill) => {
-    switch (skill.update_status) {
-      case "up_to_date":
-        return t("mySkills.updateStatus.upToDate");
-      case "update_available":
-        return t("mySkills.updateStatus.available");
-      case "error":
-        return t("mySkills.updateStatus.error");
-      case "source_missing":
-        return t("mySkills.updateStatus.sourceMissing");
-      case "updating":
-        return t("mySkills.updateStatus.updating");
-      case "checking":
-        return t("mySkills.updateStatus.checking");
-      case "local_only":
-        return t("mySkills.updateStatus.localOnly");
-      default:
-        return t("mySkills.updateStatus.unknown");
-    }
-  };
-
-  const revisionSummary = (skill: ManagedSkill) => {
-    if (skill.source_revision && skill.remote_revision && skill.source_revision !== skill.remote_revision) {
-      return `${skill.source_revision.slice(0, 7)} -> ${skill.remote_revision.slice(0, 7)}`;
-    }
-    if (skill.source_revision) return skill.source_revision.slice(0, 7);
-    if (skill.last_check_error) return skill.last_check_error;
-    return "—";
-  };
-
   const canRefresh = (skill: ManagedSkill) =>
     skill.source_type === "git" ||
     skill.source_type === "skillssh" ||
@@ -226,6 +179,49 @@ export function MySkills() {
     skill.source_type === "local" || skill.source_type === "import"
       ? t("mySkills.updateActions.reimport")
       : t("mySkills.updateActions.update");
+
+  const statusBadge = (skill: ManagedSkill, enabledInScenario: boolean, isSynced: boolean) => {
+    if (skill.update_status === "update_available") {
+      return {
+        label: "Update",
+        className: "bg-amber-500/12 text-amber-400",
+      };
+    }
+    if (skill.update_status === "source_missing") {
+      return {
+        label: t("mySkills.updateStatus.sourceMissing"),
+        className: "bg-red-500/10 text-red-300",
+      };
+    }
+    if (skill.update_status === "error") {
+      return {
+        label: t("mySkills.updateStatus.error"),
+        className: "bg-red-500/10 text-red-300",
+      };
+    }
+    if (enabledInScenario) {
+      return {
+        label: activeScenarioName,
+        className: "bg-amber-500/10 text-amber-400/90",
+      };
+    }
+    if (isSynced) {
+      return {
+        label: t("mySkills.synced"),
+        className: "bg-emerald-500/10 text-emerald-400",
+      };
+    }
+    if (skill.update_status === "local_only") {
+      return {
+        label: t("mySkills.updateStatus.localOnly"),
+        className: "bg-background text-faint",
+      };
+    }
+    return {
+      label: t("mySkills.standby"),
+      className: "bg-background text-faint",
+    };
+  };
 
   return (
     <div className="mx-auto flex h-full max-w-[1200px] flex-col animate-in fade-in duration-400">
@@ -328,13 +324,14 @@ export function MySkills() {
             const enabledInScenario = activeScenario
               ? skill.scenario_ids.includes(activeScenario.id)
               : false;
+            const badge = statusBadge(skill, enabledInScenario, isSynced);
 
             /* ── Grid Card ── */
             if (viewMode === "grid") {
               return (
                 <div
                   key={skill.id}
-                  className="group relative flex min-h-[232px] flex-col overflow-hidden rounded-[20px] border border-border-subtle bg-surface transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-[0_16px_40px_rgba(0,0,0,0.06)]"
+                  className="group relative flex min-h-[208px] flex-col overflow-hidden rounded-[20px] border border-border-subtle bg-surface transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-[0_16px_40px_rgba(0,0,0,0.06)]"
                 >
                   <div className="absolute right-3 top-3 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                     <button
@@ -365,7 +362,7 @@ export function MySkills() {
                   </div>
 
                   <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
-                    <div className="mb-3 flex items-start gap-3 pr-28">
+                    <div className="mb-4 flex items-start gap-3 pr-28">
                       <div className="mt-0.5">
                         {isSynced ? (
                           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
@@ -375,46 +372,31 @@ export function MySkills() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3
-                          className="cursor-pointer truncate text-[18px] font-semibold tracking-[-0.03em] text-primary hover:text-accent-light"
+                          className="min-w-0 cursor-pointer truncate text-[18px] font-semibold tracking-[-0.03em] text-primary hover:text-accent-light"
                           onClick={() => openSkillDetailById(skill.id)}
                           title={skill.name}
                         >
                           {skill.name}
                         </h3>
-                        <p className="mt-2 h-[38px] overflow-hidden text-[12px] leading-[19px] text-muted">
+                        <p className="mt-2 h-[40px] overflow-hidden text-[13px] leading-[20px] text-muted">
                           {skill.description || "—"}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-[10px] font-medium text-tertiary">
+                    <div className="mb-4 flex items-center gap-2 text-[11px] text-muted">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary">
                         {sourceIcon(skill.source_type)}
-                        {sourceTypeLabel(skill)}
-                      </span>
-                      <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-medium", updateTone(skill.update_status))}>
-                        {updateLabel(skill)}
-                      </span>
-                      <span className="rounded-full bg-background px-2.5 py-1 text-[10px] font-medium text-faint">
-                        {revisionSummary(skill)}
+                        <span>{sourceTypeLabel(skill)}</span>
                       </span>
                       <span
                         className={cn(
-                          "rounded-full px-2.5 py-1 text-[10px] font-medium",
-                          enabledInScenario
-                            ? "bg-amber-500/10 text-amber-400/90"
-                            : "bg-background text-faint"
+                          "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em]",
+                          badge.className,
+                          badge.label === "Update" && "uppercase tracking-[0.08em]"
                         )}
                       >
-                        {enabledInScenario ? activeScenarioName : t("mySkills.notInScenario")}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-1 text-[10px] font-medium",
-                          isSynced ? "bg-emerald-500/10 text-emerald-400" : "bg-background text-faint"
-                        )}
-                      >
-                        {isSynced ? t("mySkills.synced") : t("mySkills.standby")}
+                        {badge.label}
                       </span>
                     </div>
 
@@ -475,25 +457,18 @@ export function MySkills() {
                   </p>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-[10px] font-medium text-tertiary">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary">
                       {sourceIcon(skill.source_type)}
-                      {sourceTypeLabel(skill)}
-                    </span>
-                    <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-medium", updateTone(skill.update_status))}>
-                      {updateLabel(skill)}
-                    </span>
-                    <span className="rounded-full bg-background px-2.5 py-1 text-[10px] font-medium text-faint">
-                      {revisionSummary(skill)}
+                      <span>{sourceTypeLabel(skill)}</span>
                     </span>
                     <span
                       className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] font-medium",
-                        enabledInScenario
-                          ? "bg-amber-500/10 text-amber-400/90"
-                          : "bg-background text-faint"
+                        "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em]",
+                        badge.className,
+                        badge.label === "Update" && "uppercase tracking-[0.08em]"
                       )}
                     >
-                      {enabledInScenario ? activeScenarioName : t("mySkills.notInScenario")}
+                      {badge.label}
                     </span>
                   </div>
                 </div>

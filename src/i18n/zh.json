@@ -166,17 +166,10 @@
     "installing": "安装中...",
     "local": {
       "title": "导入本地 Skill 源",
-      "description": "直接选择包含 `SKILL.md` 的文件夹，或导入 `.zip` / `.skill` 文件。这里不再假装支持拖拽，入口会明确对应真实行为。",
+      "description": "选择包含 `SKILL.md` 的文件夹，或导入 `.zip` / `.skill` 文件。",
       "selectFolder": "选择文件夹",
-      "selectArchive": "选择压缩包或单文件",
-      "support": {
-        "folder": "支持技能文件夹",
-        "zip": "支持 .zip 压缩包",
-        "single": "支持 .skill 单文件"
-      }
+      "selectArchive": "选择压缩包或单文件"
     },
-    "dragDrop": "拖拽 Skills 文件夹到此处",
-    "dragDropDesc": "支持包含 SKILL.md 的文件夹、.zip 压缩包或单体 .skill 文件。",
     "selectLocal": "选择本地文件...",
     "gitTitle": "从 Git 仓库安装",
     "gitDesc": "输入公共或私有 Git 仓库地址。私有仓库请确保本地已配置对应的 SSH 密钥。",

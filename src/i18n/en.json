@@ -166,17 +166,10 @@
     "installing": "Installing...",
     "local": {
       "title": "Import a local skill source",
-      "description": "Choose a folder that contains `SKILL.md`, or import a `.zip` or `.skill` package. The entry now matches the real behavior instead of promising drag and drop.",
+      "description": "Choose a folder that contains `SKILL.md`, or import a `.zip` or `.skill` package.",
       "selectFolder": "Select folder",
-      "selectArchive": "Select archive or file",
-      "support": {
-        "folder": "Supports skill folders",
-        "zip": "Supports .zip archives",
-        "single": "Supports .skill files"
-      }
+      "selectArchive": "Select archive or file"
     },
-    "dragDrop": "Drag & Drop Skills Folder Here",
-    "dragDropDesc": "Supports folders with SKILL.md, .zip archives, or .skill files.",
     "selectLocal": "Select local file...",
     "gitTitle": "Install from Git Repository",
     "gitDesc": "Enter a public or private Git repository URL. For private repos, ensure SSH keys are configured.",

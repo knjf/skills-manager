@@ -526,52 +526,46 @@ export function InstallSkills() {
 
       {activeTab === "local" && (
         <div className="space-y-4 pb-8 animate-in fade-in duration-300">
-          <section className="rounded-[28px] border border-border-subtle bg-[linear-gradient(135deg,var(--color-surface),rgba(5,150,105,0.07))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-xl">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-border-subtle bg-background">
-                  <FolderUp className="h-5 w-5 text-accent-light" />
+          <section className="overflow-hidden rounded-lg border border-border-subtle bg-surface">
+            <div className="border-b border-border-subtle px-4 py-3.5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-xl">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                    <span className="inline-flex items-center gap-1.5 rounded-[5px] border border-accent-border bg-accent-bg px-2 py-1 font-medium text-accent-light">
+                      <FolderUp className="h-3.5 w-3.5" />
+                      {t("install.local.title")}
+                    </span>
+                  </div>
+
+                  <h2 className="text-[14px] font-semibold text-secondary">
+                    {t("install.local.title")}
+                  </h2>
+                  <p className="mt-1 text-[12px] leading-5 text-muted">
+                    {t("install.local.description")}
+                  </p>
                 </div>
-                <h2 className="text-[15px] font-semibold text-primary">{t("install.local.title")}</h2>
-                <p className="mt-1 text-[12px] leading-5 text-muted">
-                  {t("install.local.description")}
-                </p>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleLocalFolderInstall}
-                  className="inline-flex items-center gap-2 rounded-xl border border-accent-border bg-accent-dark px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent"
-                >
-                  <FolderUp className="h-4 w-4" />
-                  {t("install.local.selectFolder")}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLocalFileInstall}
-                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-[12px] font-medium text-secondary transition-colors hover:bg-surface-hover"
-                >
-                  <UploadCloud className="h-4 w-4" />
-                  {t("install.local.selectArchive")}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleLocalFolderInstall}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-accent-border bg-accent-dark px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent"
+                  >
+                    <FolderUp className="h-4 w-4" />
+                    {t("install.local.selectFolder")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLocalFileInstall}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-border-subtle bg-background px-4 py-2 text-[12px] font-medium text-secondary transition-colors hover:bg-surface-hover"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    {t("install.local.selectArchive")}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                t("install.local.support.folder"),
-                t("install.local.support.zip"),
-                t("install.local.support.single"),
-              ].map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-border-subtle bg-background/80 px-3 py-1 text-[11px] text-muted"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
           </section>
 
           {localError ? (

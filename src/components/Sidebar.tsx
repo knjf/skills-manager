@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Hammer,
   LayoutDashboard,
   Layers,
   Download,
@@ -99,9 +98,11 @@ export function Sidebar() {
         <div className="h-[38px] shrink-0" />
         {/* App logo — sits below macOS window controls */}
         <div className="flex items-center px-3 gap-2.5 pb-2 shrink-0">
-          <div className="w-[20px] h-[20px] rounded-[5px] bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
-            <Hammer className="w-3 h-3 text-white" />
-          </div>
+          <img
+            src="/icons/32x32.png"
+            alt="logo"
+            className="w-[20px] h-[20px] shrink-0"
+          />
           <span className="text-[14px] font-semibold text-secondary tracking-tight truncate leading-[20px]">
             {t("app.name")}
           </span>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useDeferredValue, useMemo } from "react";
 import {
   DownloadCloud,
   UploadCloud,
@@ -16,6 +16,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import type { ScanResult, SkillsShSkill } from "../lib/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSearchParams } from "react-router-dom";
+import { StatusBanner } from "../components/StatusBanner";
 
 const MARKET_PAGE_SIZE = 24;
 
@@ -35,18 +37,24 @@ export function InstallSkills() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"market" | "local" | "git">("market");
   const [marketTab, setMarketTab] = useState<"hot" | "trending" | "alltime">("hot");
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketSourceFilter, setMarketSourceFilter] = useState("all");
   const [marketSkills, setMarketSkills] = useState<SkillsShSkill[]>([]);
   const [marketPage, setMarketPage] = useState(1);
   const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState<string | null>(null);
+  const [marketReloadKey, setMarketReloadKey] = useState(0);
   const [installing, setInstalling] = useState<string | null>(null);
   const [gitUrl, setGitUrl] = useState("");
   const [gitName, setGitName] = useState("");
   const [gitLoading, setGitLoading] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [importingPaths, setImportingPaths] = useState<Set<string>>(new Set());
   const [importingAll, setImportingAll] = useState(false);
   const marketListRef = useRef<HTMLDivElement | null>(null);
+  const deferredMarketQuery = useDeferredValue(marketQuery);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -62,37 +70,88 @@ export function InstallSkills() {
 
   const runScan = useCallback(async () => {
     setScanLoading(true);
+    setLocalError(null);
     try {
       const result = await api.scanLocalSkills();
       setScanResult(result);
     } catch (e: any) {
       console.error(e);
-      toast.error(e.toString());
+      const message = e?.toString?.() || t("common.error");
+      setLocalError(message);
+      toast.error(message);
     } finally {
       setScanLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    if (activeTab === "market") {
-      setMarketLoading(true);
-      setMarketPage(1);
-      api
-        .fetchLeaderboard(marketTab)
-        .then(setMarketSkills)
-        .catch((e) => {
-          console.error(e);
-          toast.error(t("common.error"));
-        })
-        .finally(() => setMarketLoading(false));
-    }
-  }, [activeTab, marketTab, t]);
+    if (activeTab !== "market") return;
+
+    const query = deferredMarketQuery.trim();
+    setMarketLoading(true);
+    setMarketPage(1);
+    setMarketError(null);
+
+    const request = query
+      ? api.searchSkillssh(query)
+      : api.fetchLeaderboard(marketTab);
+
+    request
+      .then((result) => {
+        setMarketSkills(result);
+        setMarketSourceFilter("all");
+      })
+      .catch((e) => {
+        console.error(e);
+        const message = e?.toString?.() || t("common.error");
+        setMarketError(message);
+        toast.error(message);
+      })
+      .finally(() => setMarketLoading(false));
+  }, [activeTab, deferredMarketQuery, marketReloadKey, marketTab, t]);
 
   useEffect(() => {
     if (activeTab === "local" && !scanResult && !scanLoading) {
       runScan();
     }
   }, [activeTab, scanLoading, scanResult, runScan]);
+
+  const installLocalSource = async (sourcePath: string) => {
+    await api.installLocal(sourcePath);
+    toast.success(t("common.success"));
+    await Promise.all([refreshScenarios(), refreshManagedSkills()]);
+    await runScan();
+  };
+
+  const handleLocalFolderInstall = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      });
+      if (!selected) return;
+      await installLocalSource(selected as string);
+    } catch (e: any) {
+      const message = e?.toString?.() || t("common.error");
+      setLocalError(message);
+      toast.error(message);
+    }
+  };
+
+  const handleLocalFileInstall = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Skills", extensions: ["zip", "skill"] }],
+      });
+      if (!selected) return;
+      await installLocalSource(selected as string);
+    } catch (e: any) {
+      const message = e?.toString?.() || t("common.error");
+      setLocalError(message);
+      toast.error(message);
+    }
+  };
 
   const handleInstallSkillssh = async (skill: SkillsShSkill) => {
     setInstalling(skill.id);
@@ -104,23 +163,6 @@ export function InstallSkills() {
       toast.error(e.toString());
     } finally {
       setInstalling(null);
-    }
-  };
-
-  const handleLocalInstall = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        filters: [{ name: "Skills", extensions: ["zip", "skill"] }],
-      });
-      if (!selected) return;
-      await api.installLocal(selected as string);
-      toast.success(t("common.success"));
-      await Promise.all([refreshScenarios(), refreshManagedSkills()]);
-      await runScan();
-    } catch (e: any) {
-      toast.error(e.toString());
     }
   };
 
@@ -184,10 +226,18 @@ export function InstallSkills() {
   const scanGroups = scanResult?.groups ?? [];
   const pendingGroups = scanGroups.filter((group) => !group.imported);
   const importedGroups = scanGroups.length - pendingGroups.length;
-  const totalMarketPages = Math.max(1, Math.ceil(marketSkills.length / MARKET_PAGE_SIZE));
+  const sourceOptions = useMemo(
+    () => Array.from(new Set(marketSkills.map((skill) => skill.source))).slice(0, 8),
+    [marketSkills]
+  );
+  const filteredMarketSkills = useMemo(() => {
+    if (marketSourceFilter === "all") return marketSkills;
+    return marketSkills.filter((skill) => skill.source === marketSourceFilter);
+  }, [marketSkills, marketSourceFilter]);
+  const totalMarketPages = Math.max(1, Math.ceil(filteredMarketSkills.length / MARKET_PAGE_SIZE));
   const currentMarketPage = Math.min(marketPage, totalMarketPages);
   const marketPageStart = (currentMarketPage - 1) * MARKET_PAGE_SIZE;
-  const paginatedMarketSkills = marketSkills.slice(
+  const paginatedMarketSkills = filteredMarketSkills.slice(
     marketPageStart,
     marketPageStart + MARKET_PAGE_SIZE
   );
@@ -199,12 +249,12 @@ export function InstallSkills() {
     if (page === 1 || page === totalMarketPages) return true;
     return Math.abs(page - currentMarketPage) <= 1;
   });
+  const hasMarketQuery = deferredMarketQuery.trim().length > 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto h-full flex flex-col animate-in fade-in duration-400">
-      {/* Page header + tabs */}
+    <div className="h-full max-w-[1200px] animate-in fade-in duration-400">
       <div className="mb-5">
-        <h1 className="text-[15px] font-semibold text-primary mb-4">{t("install.title")}</h1>
+        <h1 className="mb-4 text-[15px] font-semibold text-primary">{t("install.title")}</h1>
         <div className="flex gap-1 border-b border-border-subtle">
           {[
             { id: "market" as const, label: t("install.browseMarket"), icon: Box },
@@ -218,13 +268,13 @@ export function InstallSkills() {
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
                 className={cn(
-                  "pb-2.5 px-1 text-[12px] font-medium flex items-center gap-1.5 border-b-2 transition-colors outline-none mr-4",
+                  "mr-4 flex items-center gap-1.5 border-b-2 px-1 pb-2.5 text-[12px] font-medium transition-colors outline-none",
                   isActive
                     ? "border-accent text-accent"
                     : "border-transparent text-muted hover:text-tertiary"
                 )}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="h-3.5 w-3.5" />
                 {tab.label}
               </button>
             );
@@ -232,182 +282,320 @@ export function InstallSkills() {
         </div>
       </div>
 
-      {/* Market tab */}
       {activeTab === "market" && (
-        <div className="flex-1 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex bg-surface border border-border-subtle rounded-[4px] p-px">
-              {[
-                { id: "hot" as const, label: t("install.hot"), icon: Star },
-                { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
-                { id: "alltime" as const, label: t("install.all"), icon: Clock },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = marketTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setMarketTab(tab.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
-                      isActive ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
-                    )}
-                  >
-                    <Icon className="w-3 h-3" />
-                    {tab.label}
-                  </button>
-                );
-              })}
+        <div className="animate-in fade-in duration-300">
+          <div className="mb-4 rounded-lg border border-border-subtle bg-surface p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                    <span className="inline-flex items-center gap-1.5 rounded-[5px] border border-border-subtle bg-background px-2 py-1 font-medium text-tertiary">
+                      <Box className="h-3 w-3" />
+                      {t("install.browseMarket")}
+                    </span>
+                    <span className="text-faint">·</span>
+                    <span>
+                      {hasMarketQuery
+                        ? t("install.marketMode.search", { query: deferredMarketQuery.trim() })
+                        : t(`install.marketMode.${marketTab}`)}
+                    </span>
+                    <span className="text-faint">·</span>
+                    <span>{t("install.filters.filteredCount", { count: filteredMarketSkills.length })}</span>
+                  </div>
+
+                  <div className="relative max-w-[560px]">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+                    <input
+                      type="text"
+                      value={marketQuery}
+                      onChange={(event) => setMarketQuery(event.target.value)}
+                      placeholder={t("install.searchMarket")}
+                      className="h-[38px] w-full rounded-[6px] border border-border-subtle bg-background pl-9 pr-3 text-[13px] text-secondary outline-none transition-colors placeholder:text-faint focus:border-border"
+                    />
+                  </div>
+                </div>
+
+                {!hasMarketQuery ? (
+                  <div className="flex rounded-[6px] border border-border-subtle bg-background p-0.5">
+                    {[
+                      { id: "hot" as const, label: t("install.hot"), icon: Star },
+                      { id: "trending" as const, label: t("install.trending"), icon: TrendingUp },
+                      { id: "alltime" as const, label: t("install.all"), icon: Clock },
+                    ].map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = marketTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setMarketTab(tab.id)}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-[5px] px-3 py-2 text-[11px] font-medium transition-colors outline-none",
+                            isActive
+                              ? "bg-surface-active text-secondary"
+                              : "text-muted hover:text-tertiary"
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-t border-border-subtle pt-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[11px] text-muted">
+                    <span className="font-medium text-tertiary">{t("install.filters.allSources")}</span>
+                    {marketSourceFilter !== "all" ? (
+                      <>
+                        <span className="text-faint">·</span>
+                        <span>@{marketSourceFilter}</span>
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="text-[11px] text-faint">{sourceOptions.length + 1} filters</div>
+                </div>
+
+                <div className="overflow-x-auto scrollbar-hide">
+                  <div className="flex min-w-max gap-2 pr-2">
+                    <button
+                      type="button"
+                      onClick={() => setMarketSourceFilter("all")}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+                        marketSourceFilter === "all"
+                          ? "border-accent-border bg-accent-bg text-accent-light"
+                          : "border-border-subtle bg-background text-muted hover:text-secondary"
+                      )}
+                    >
+                      {t("install.filters.allSources")}
+                    </button>
+                    {sourceOptions.map((source) => (
+                      <button
+                        key={source}
+                        type="button"
+                        onClick={() => setMarketSourceFilter(source)}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+                          marketSourceFilter === source
+                            ? "border-accent-border bg-accent-bg text-accent-light"
+                            : "border-border-subtle bg-background text-muted hover:text-secondary"
+                        )}
+                      >
+                        @{source}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
+          {marketError ? (
+            <div className="mb-4">
+              <StatusBanner
+                compact
+                title={t("common.requestFailed")}
+                description={marketError}
+                actionLabel={t("common.retry")}
+                onAction={() => setMarketReloadKey((value) => value + 1)}
+                tone="danger"
+              />
+            </div>
+          ) : null}
+
           {marketLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-5 h-5 text-muted animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted" />
             </div>
           ) : (
             <div className="pb-8">
-              <div
-                ref={marketListRef}
-                className="mb-4 flex scroll-mt-4 flex-col gap-3 rounded-lg border border-border-subtle bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <p className="text-[11px] text-muted">
-                  {t("install.pagination.summary", {
-                    start: marketSkills.length === 0 ? 0 : marketPageStart + 1,
-                    end: Math.min(marketPageStart + MARKET_PAGE_SIZE, marketSkills.length),
-                    total: marketSkills.length,
-                  })}
-                </p>
-                <div className="text-[11px] text-faint">
-                  {t("install.pagination.page", {
-                    current: currentMarketPage,
-                    total: totalMarketPages,
-                  })}
-                </div>
-              </div>
+              <div ref={marketListRef} className="scroll-mt-4" />
 
-              <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-                {paginatedMarketSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className="bg-surface border border-border-subtle rounded-lg p-3.5 hover:border-border transition-colors flex items-center gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-secondary text-[13px] truncate">{skill.name || skill.skill_id}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-accent-light font-medium bg-accent-bg px-1.5 py-0.5 rounded">
-                          @{skill.source}
-                        </span>
-                        <span className="text-[10px] text-muted flex items-center gap-1">
-                          <DownloadCloud className="w-3 h-3" />
-                          {skill.installs > 1000
-                            ? `${(skill.installs / 1000).toFixed(0)}k`
-                            : skill.installs}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => openUrl(`https://skills.sh/${skill.source}/${skill.skill_id}`)}
-                        className="p-1.5 rounded-[4px] text-muted hover:text-secondary hover:bg-surface-hover transition-colors"
-                        title={t("install.viewOnWeb")}
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleInstallSkillssh(skill)}
-                        disabled={installing === skill.id}
-                        className="p-1.5 rounded-[4px] bg-accent-dark hover:bg-accent text-white transition-colors disabled:opacity-50 border border-accent-border"
-                        title={t("install.oneClickInstall")}
-                      >
-                        {installing === skill.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Plus className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
+              {filteredMarketSkills.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-border-subtle bg-surface px-6 py-14 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background text-muted">
+                    <Search className="h-5 w-5" />
                   </div>
-                ))}
-              </div>
-
-              {totalMarketPages > 1 && (
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
-                  <button
-                    onClick={() => changeMarketPage(Math.max(1, currentMarketPage - 1))}
-                    disabled={currentMarketPage === 1}
-                    className="inline-flex items-center gap-1 rounded-[6px] border border-border-subtle bg-surface px-3 py-1.5 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    {t("install.pagination.previous")}
-                  </button>
-
-                  {visibleMarketPages.map((page, index) => {
-                    const previousPage = visibleMarketPages[index - 1];
-                    const showGap = previousPage && page - previousPage > 1;
-
-                    return (
-                      <div key={page} className="flex items-center gap-1.5">
-                        {showGap && (
-                          <span className="px-1 text-[11px] text-faint">...</span>
-                        )}
-                        <button
-                          onClick={() => changeMarketPage(page)}
-                          className={cn(
-                            "min-w-8 rounded-[6px] border px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
-                            page === currentMarketPage
-                              ? "border-accent-border bg-accent-dark text-white"
-                              : "border-border-subtle bg-surface text-secondary hover:bg-surface-hover"
-                          )}
-                        >
-                          {page}
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  <button
-                    onClick={() => changeMarketPage(Math.min(totalMarketPages, currentMarketPage + 1))}
-                    disabled={currentMarketPage === totalMarketPages}
-                    className="inline-flex items-center gap-1 rounded-[6px] border border-border-subtle bg-surface px-3 py-1.5 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
-                  >
-                    {t("install.pagination.next")}
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
+                  <h3 className="mt-4 text-[14px] font-semibold text-secondary">
+                    {t("install.noResults.title")}
+                  </h3>
+                  <p className="mt-1 max-w-md text-[12px] text-muted">
+                    {t("install.noResults.description")}
+                  </p>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+                    {paginatedMarketSkills.map((skill) => (
+                      <div
+                        key={skill.id}
+                        className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface p-3.5 transition-colors hover:border-border"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-[13px] font-semibold text-secondary">
+                            {skill.name || skill.skill_id}
+                          </h3>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="rounded bg-accent-bg px-1.5 py-0.5 text-[10px] font-medium text-accent-light">
+                              @{skill.source}
+                            </span>
+                            <span className="flex items-center gap-1 text-[10px] text-muted">
+                              <DownloadCloud className="h-3 w-3" />
+                              {skill.installs > 1000
+                                ? `${(skill.installs / 1000).toFixed(0)}k`
+                                : skill.installs}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            onClick={() => openUrl(`https://skills.sh/${skill.source}/${skill.skill_id}`)}
+                            className="rounded-[4px] p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
+                            title={t("install.viewOnWeb")}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleInstallSkillssh(skill)}
+                            disabled={installing === skill.id}
+                            className="rounded-[4px] border border-accent-border bg-accent-dark p-1.5 text-white transition-colors hover:bg-accent disabled:opacity-50"
+                            title={t("install.oneClickInstall")}
+                          >
+                            {installing === skill.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Plus className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {totalMarketPages > 1 ? (
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => changeMarketPage(Math.max(1, currentMarketPage - 1))}
+                        disabled={currentMarketPage === 1}
+                        className="inline-flex items-center gap-1 rounded-[6px] border border-border-subtle bg-surface px-3 py-1.5 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                        {t("install.pagination.previous")}
+                      </button>
+
+                      {visibleMarketPages.map((page, index) => {
+                        const previousPage = visibleMarketPages[index - 1];
+                        const showGap = previousPage && page - previousPage > 1;
+
+                        return (
+                          <div key={page} className="flex items-center gap-1.5">
+                            {showGap ? <span className="px-1 text-[11px] text-faint">...</span> : null}
+                            <button
+                              onClick={() => changeMarketPage(page)}
+                              className={cn(
+                                "min-w-8 rounded-[6px] border px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
+                                page === currentMarketPage
+                                  ? "border-accent-border bg-accent-dark text-white"
+                                  : "border-border-subtle bg-surface text-secondary hover:bg-surface-hover"
+                              )}
+                            >
+                              {page}
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => changeMarketPage(Math.min(totalMarketPages, currentMarketPage + 1))}
+                        disabled={currentMarketPage === totalMarketPages}
+                        className="inline-flex items-center gap-1 rounded-[6px] border border-border-subtle bg-surface px-3 py-1.5 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        {t("install.pagination.next")}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* Local tab */}
       {activeTab === "local" && (
-        <div className="flex-1 animate-in fade-in duration-300 space-y-4 pb-8">
-          <div
-            onClick={handleLocalInstall}
-            className="w-full bg-surface border border-dashed border-border rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-surface-hover hover:border-accent-border transition-colors cursor-pointer group"
-          >
-            <div className="w-10 h-10 bg-surface-hover rounded-full flex items-center justify-center mb-3 group-hover:bg-accent-bg transition-colors">
-              <FolderUp className="w-5 h-5 text-muted group-hover:text-accent-light" />
-            </div>
-            <h3 className="text-[13px] font-semibold text-secondary mb-1">{t("install.dragDrop")}</h3>
-            <p className="text-muted text-[12px] mb-3 max-w-sm">{t("install.dragDropDesc")}</p>
-            <button className="px-3 py-1.5 rounded-[4px] bg-surface-active hover:bg-surface-hover border border-border text-secondary text-[11px] font-medium transition-colors">
-              {t("install.selectLocal")}
-            </button>
-          </div>
+        <div className="space-y-4 pb-8 animate-in fade-in duration-300">
+          <section className="rounded-[28px] border border-border-subtle bg-[linear-gradient(135deg,var(--color-surface),rgba(5,150,105,0.07))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-xl">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-border-subtle bg-background">
+                  <FolderUp className="h-5 w-5 text-accent-light" />
+                </div>
+                <h2 className="text-[15px] font-semibold text-primary">{t("install.local.title")}</h2>
+                <p className="mt-1 text-[12px] leading-5 text-muted">
+                  {t("install.local.description")}
+                </p>
+              </div>
 
-          <section className="bg-surface border border-border-subtle rounded-lg overflow-hidden">
-            <div className="px-4 py-3.5 border-b border-border-subtle flex items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleLocalFolderInstall}
+                  className="inline-flex items-center gap-2 rounded-xl border border-accent-border bg-accent-dark px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent"
+                >
+                  <FolderUp className="h-4 w-4" />
+                  {t("install.local.selectFolder")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLocalFileInstall}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-[12px] font-medium text-secondary transition-colors hover:bg-surface-hover"
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  {t("install.local.selectArchive")}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                t("install.local.support.folder"),
+                t("install.local.support.zip"),
+                t("install.local.support.single"),
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-border-subtle bg-background/80 px-3 py-1 text-[11px] text-muted"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          {localError ? (
+            <StatusBanner
+              compact
+              title={t("common.requestFailed")}
+              description={localError}
+              actionLabel={t("common.retry")}
+              onAction={runScan}
+              tone="danger"
+            />
+          ) : null}
+
+          <section className="overflow-hidden rounded-lg border border-border-subtle bg-surface">
+            <div className="flex items-center justify-between gap-4 border-b border-border-subtle px-4 py-3.5">
               <div>
                 <h2 className="text-[13px] font-semibold text-secondary">{t("install.scan.title")}</h2>
-                <p className="text-[11px] text-muted mt-0.5">
+                <p className="mt-0.5 text-[11px] text-muted">
                   {scanResult
                     ? t("install.scan.summary", {
-                      tools: scanResult.tools_scanned,
-                      skills: scanResult.skills_found,
-                    })
+                        tools: scanResult.tools_scanned,
+                        skills: scanResult.skills_found,
+                      })
                     : t("install.scan.initial")}
                 </p>
               </div>
@@ -416,27 +604,27 @@ export function InstallSkills() {
                 <button
                   onClick={runScan}
                   disabled={scanLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active border border-border text-secondary text-[11px] font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-[4px] border border-border bg-surface-hover px-3 py-1.5 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-active disabled:opacity-50"
                 >
-                  <RefreshCw className={cn("w-3.5 h-3.5", scanLoading && "animate-spin")} />
+                  <RefreshCw className={cn("h-3.5 w-3.5", scanLoading && "animate-spin")} />
                   {t("install.scan.rescan")}
                 </button>
                 <button
                   onClick={handleImportAllDiscovered}
-                  disabled={scanLoading || importingAll || !scanResult || scanResult.groups.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-accent-dark hover:bg-accent border border-accent-border text-white text-[11px] font-medium transition-colors disabled:opacity-50"
+                  disabled={scanLoading || importingAll || pendingGroups.length === 0}
+                  className="flex items-center gap-1.5 rounded-[4px] border border-accent-border bg-accent-dark px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent disabled:opacity-50"
                 >
                   {importingAll ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <DownloadCloud className="w-3.5 h-3.5" />
+                    <DownloadCloud className="h-3.5 w-3.5" />
                   )}
                   {t("install.scan.importAll")}
                 </button>
               </div>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="space-y-4 p-4">
               <div className="grid gap-2 md:grid-cols-3">
                 <div className="rounded-lg border border-border-subtle bg-bg-secondary px-3.5 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -459,16 +647,16 @@ export function InstallSkills() {
               </div>
 
               {scanLoading ? (
-                <div className="py-12 flex items-center justify-center gap-2.5 text-muted">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                <div className="flex items-center justify-center gap-2.5 py-12 text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-[12px]">{t("install.scan.scanning")}</span>
                 </div>
               ) : scanResult && scanGroups.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center">
-                  <div className="w-10 h-10 rounded-lg bg-surface-hover border border-border flex items-center justify-center mb-3">
-                    <FolderSearch className="w-5 h-5 text-muted" />
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-hover">
+                    <FolderSearch className="h-5 w-5 text-muted" />
                   </div>
-                  <h3 className="text-[13px] font-semibold text-tertiary mb-1">
+                  <h3 className="mb-1 text-[13px] font-semibold text-tertiary">
                     {t("install.scan.noResults")}
                   </h3>
                   <p className="text-[11px] text-muted">{t("install.scan.noResultsHint")}</p>
@@ -522,8 +710,8 @@ export function InstallSkills() {
                               )}
                             </div>
 
-                            {primaryLocation && (
-                              <div className="col-span-2 min-w-0 flex items-center gap-2 lg:col-span-1">
+                            {primaryLocation ? (
+                              <div className="col-span-2 flex min-w-0 items-center gap-2 lg:col-span-1">
                                 <span className="inline-flex shrink-0 rounded-[4px] border border-border-subtle bg-surface px-1.5 py-px text-[10px] font-medium text-tertiary">
                                   {primaryLocation.tool}
                                 </span>
@@ -531,10 +719,10 @@ export function InstallSkills() {
                                   {primaryLocation.found_path}
                                 </code>
                               </div>
-                            )}
+                            ) : null}
                           </div>
 
-                          {otherLocations.length > 0 && (
+                          {otherLocations.length > 0 ? (
                             <div className="border-t border-border-subtle bg-surface/40 px-3 py-1.5">
                               <div className="space-y-1">
                                 {otherLocations.map((location) => (
@@ -549,7 +737,7 @@ export function InstallSkills() {
                                 ))}
                               </div>
                             </div>
-                          )}
+                          ) : null}
                         </article>
                       );
                     })}
@@ -561,19 +749,18 @@ export function InstallSkills() {
         </div>
       )}
 
-      {/* Git tab */}
       {activeTab === "git" && (
-        <div className="flex-1 animate-in fade-in duration-300">
-          <div className="max-w-lg bg-surface border border-border-subtle rounded-lg p-5">
-            <div className="mb-4 flex items-center justify-center w-10 h-10 bg-surface-hover rounded-lg border border-border">
-              <Github className="w-5 h-5 text-tertiary" />
+        <div className="animate-in fade-in duration-300">
+          <div className="max-w-lg rounded-lg border border-border-subtle bg-surface p-5">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-hover">
+              <Github className="h-5 w-5 text-tertiary" />
             </div>
-            <h2 className="text-[13px] font-semibold text-primary mb-1">{t("install.gitTitle")}</h2>
-            <p className="text-muted text-[12px] mb-4">{t("install.gitDesc")}</p>
+            <h2 className="mb-1 text-[13px] font-semibold text-primary">{t("install.gitTitle")}</h2>
+            <p className="mb-4 text-[12px] text-muted">{t("install.gitDesc")}</p>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-medium text-tertiary mb-1">
+                <label className="mb-1 block text-[11px] font-medium text-tertiary">
                   {t("install.repoUrl")}
                 </label>
                 <input
@@ -581,32 +768,34 @@ export function InstallSkills() {
                   value={gitUrl}
                   onChange={(e) => setGitUrl(e.target.value)}
                   placeholder={t("install.repoUrlPlaceholder")}
-                  className="w-full bg-background border border-border-subtle rounded-[4px] px-3 py-2 text-[12px] text-secondary focus:outline-none focus:border-border transition-all placeholder-faint"
+                  className="w-full rounded-[4px] border border-border-subtle bg-background px-3 py-2 text-[12px] text-secondary transition-all placeholder:text-faint focus:border-border focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-tertiary mb-1 flex items-center gap-2">
+                <label className="mb-1 flex items-center gap-2 text-[11px] font-medium text-tertiary">
                   {t("install.customName")}
-                  <span className="text-[10px] text-faint font-normal">{t("install.customNameOptional")}</span>
+                  <span className="text-[10px] font-normal text-faint">
+                    {t("install.customNameOptional")}
+                  </span>
                 </label>
                 <input
                   type="text"
                   value={gitName}
                   onChange={(e) => setGitName(e.target.value)}
                   placeholder={t("install.customNamePlaceholder")}
-                  className="w-full bg-background border border-border-subtle rounded-[4px] px-3 py-2 text-[12px] text-secondary focus:outline-none focus:border-border transition-all placeholder-faint"
+                  className="w-full rounded-[4px] border border-border-subtle bg-background px-3 py-2 text-[12px] text-secondary transition-all placeholder:text-faint focus:border-border focus:outline-none"
                 />
               </div>
               <div className="pt-2">
                 <button
                   onClick={handleGitInstall}
                   disabled={!gitUrl.trim() || gitLoading}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-[4px] bg-accent-dark hover:bg-accent text-white text-[12px] font-medium transition-colors w-full border border-accent-border disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-accent-border bg-accent-dark px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent disabled:opacity-50"
                 >
                   {gitLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <DownloadCloud className="w-3.5 h-3.5" />
+                    <DownloadCloud className="h-3.5 w-3.5" />
                   )}
                   {gitLoading ? t("install.installing") : t("install.installClone")}
                 </button>

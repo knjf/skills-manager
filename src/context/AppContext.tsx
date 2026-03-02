@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { ManagedSkill, Scenario, ToolInfo } from "../lib/tauri";
 import * as api from "../lib/tauri";
+import i18n from "../i18n";
 
 interface AppState {
   scenarios: Scenario[];
@@ -8,13 +9,16 @@ interface AppState {
   tools: ToolInfo[];
   managedSkills: ManagedSkill[];
   loading: boolean;
+  appError: string | null;
   globalSearchOpen: boolean;
   helpOpen: boolean;
   detailSkillId: string | null;
+  refreshAppData: () => Promise<void>;
   refreshScenarios: () => Promise<void>;
   refreshTools: () => Promise<void>;
   refreshManagedSkills: () => Promise<void>;
   switchScenario: (id: string) => Promise<void>;
+  clearAppError: () => void;
   openGlobalSearch: () => void;
   closeGlobalSearch: () => void;
   openHelp: () => void;
@@ -31,9 +35,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [managedSkills, setManagedSkills] = useState<ManagedSkill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [appError, setAppError] = useState<string | null>(null);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
+
+  const setTranslatedError = useCallback((key: string) => {
+    setAppError(i18n.t("common.loadFailed", { item: i18n.t(key) }));
+  }, []);
 
   const refreshScenarios = useCallback(async () => {
     try {
@@ -43,49 +52,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ]);
       setScenarios(s);
       setActiveScenario(active);
+      setAppError(null);
     } catch (e) {
       console.error("Failed to load scenarios:", e);
+      setTranslatedError("common.scenarios");
     }
-  }, []);
+  }, [setTranslatedError]);
 
   const refreshTools = useCallback(async () => {
     try {
       const t = await api.getToolStatus();
       setTools(t);
+      setAppError(null);
     } catch (e) {
       console.error("Failed to load tools:", e);
+      setTranslatedError("common.agents");
     }
-  }, []);
+  }, [setTranslatedError]);
 
   const refreshManagedSkills = useCallback(async () => {
     try {
       const skills = await api.getManagedSkills();
       setManagedSkills(skills);
+      setAppError(null);
     } catch (e) {
       console.error("Failed to load managed skills:", e);
+      setTranslatedError("common.skills");
     }
-  }, []);
+  }, [setTranslatedError]);
+
+  const refreshAppData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([refreshScenarios(), refreshTools(), refreshManagedSkills()]);
+    setLoading(false);
+  }, [refreshManagedSkills, refreshScenarios, refreshTools]);
 
   const handleSwitchScenario = useCallback(
     async (id: string) => {
       try {
         await api.switchScenario(id);
         await Promise.all([refreshScenarios(), refreshManagedSkills()]);
+        setAppError(null);
       } catch (e) {
         console.error("Failed to switch scenario:", e);
+        setTranslatedError("common.scenarios");
       }
     },
-    [refreshManagedSkills, refreshScenarios]
+    [refreshManagedSkills, refreshScenarios, setTranslatedError]
   );
 
   useEffect(() => {
     async function init() {
-      setLoading(true);
-      await Promise.all([refreshScenarios(), refreshTools(), refreshManagedSkills()]);
-      setLoading(false);
+      await refreshAppData();
     }
     init();
-  }, [refreshManagedSkills, refreshScenarios, refreshTools]);
+  }, [refreshAppData]);
 
   return (
     <AppContext.Provider
@@ -95,13 +116,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tools,
         managedSkills,
         loading,
+        appError,
         globalSearchOpen,
         helpOpen,
         detailSkillId,
+        refreshAppData,
         refreshScenarios,
         refreshTools,
         refreshManagedSkills,
         switchScenario: handleSwitchScenario,
+        clearAppError: () => setAppError(null),
         openGlobalSearch: () => setGlobalSearchOpen(true),
         closeGlobalSearch: () => setGlobalSearchOpen(false),
         openHelp: () => setHelpOpen(true),

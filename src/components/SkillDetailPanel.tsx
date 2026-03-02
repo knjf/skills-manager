@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, FileText, Folder } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useTranslation } from "react-i18next";
 import { getSkillDocument, type ManagedSkill, type SkillDocument } from "../lib/tauri";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function SkillDetailPanel({ skill, onClose }: Props) {
+  const { t } = useTranslation();
   const [doc, setDoc] = useState<SkillDocument | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +64,7 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
           {loading ? (
-            <div className="text-[12px] text-muted text-center mt-12">加载中...</div>
+            <div className="text-[12px] text-muted text-center mt-12">{t("common.loading")}</div>
           ) : doc ? (
             <article className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-secondary prose-p:text-tertiary prose-a:text-accent prose-code:text-accent-light prose-code:bg-surface-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-background prose-pre:border prose-pre:border-border-subtle">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -70,7 +72,7 @@ export function SkillDetailPanel({ skill, onClose }: Props) {
               </ReactMarkdown>
             </article>
           ) : (
-            <div className="text-[12px] text-muted text-center mt-12">没有找到文档文件</div>
+            <div className="text-[12px] text-muted text-center mt-12">{t("common.documentMissing")}</div>
           )}
         </div>
       </div>

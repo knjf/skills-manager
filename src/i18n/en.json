@@ -89,6 +89,18 @@
     "currentScenarioFallback": "Current scenario",
     "scenarioCount": "{{count}} scenarios",
     "syncCoverage": "Sync coverage",
+    "syncSummary": "{{synced}} / {{total}} synced",
+    "moreAgents": "+{{count}} more",
+    "syncMissing": "Sync {{count}}",
+    "unsyncSelected": "Unsync {{count}}",
+    "syncNothingToDo": "This skill already covers every installed agent",
+    "unsyncNothingToDo": "This skill is not synced to any agent yet",
+    "syncCompleted": "{{name}} synced to {{count}} agents",
+    "unsyncCompleted": "{{name}} unsynced from {{count}} agents",
+    "confirmSyncTitle": "Confirm sync scope",
+    "confirmUnsyncTitle": "Confirm unsync scope",
+    "confirmSyncMessage": "Sync \"{{name}}\" to these {{count}} agents.",
+    "confirmUnsyncMessage": "Remove \"{{name}}\" from these {{count}} synced agents.",
     "sourceRef": "Source",
     "localSource": "Local library",
     "agentCount": "{{count}} agents",
@@ -128,6 +140,20 @@
     "trending": "Trending",
     "all": "All Time",
     "searchMarket": "Search skills.sh market...",
+    "marketMode": {
+      "hot": "Browsing the hot leaderboard",
+      "trending": "Browsing trending skills",
+      "alltime": "Browsing the all-time leaderboard",
+      "search": "Searching for \"{{query}}\""
+    },
+    "filters": {
+      "allSources": "All sources",
+      "filteredCount": "{{count}} results right now"
+    },
+    "noResults": {
+      "title": "No matching market skills",
+      "description": "Try another keyword or clear the source filter."
+    },
     "oneClickInstall": "Install",
     "viewOnWeb": "View on skills.sh",
     "pagination": {
@@ -137,6 +163,17 @@
       "next": "Next"
     },
     "installing": "Installing...",
+    "local": {
+      "title": "Import a local skill source",
+      "description": "Choose a folder that contains `SKILL.md`, or import a `.zip` or `.skill` package. The entry now matches the real behavior instead of promising drag and drop.",
+      "selectFolder": "Select folder",
+      "selectArchive": "Select archive or file",
+      "support": {
+        "folder": "Supports skill folders",
+        "zip": "Supports .zip archives",
+        "single": "Supports .skill files"
+      }
+    },
     "dragDrop": "Drag & Drop Skills Folder Here",
     "dragDropDesc": "Supports folders with SKILL.md, .zip archives, or .skill files.",
     "selectLocal": "Select local file...",
@@ -202,6 +239,14 @@
   "common": {
     "loading": "Loading...",
     "error": "Something went wrong",
+    "requestFailed": "Request failed",
+    "retry": "Retry",
+    "loadFailed": "Failed to load {{item}}",
+    "dataOutOfDate": "Some data could not be refreshed",
+    "documentMissing": "No document file was found",
+    "scenarios": "scenarios",
+    "agents": "agent status",
+    "skills": "skill list",
     "success": "Operation successful",
     "cancel": "Cancel",
     "confirm": "Confirm",

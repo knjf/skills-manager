@@ -14,16 +14,38 @@ impl ToolAdapter {
         dirs::home_dir().expect("Cannot determine home directory")
     }
 
-    pub fn skills_dir(&self) -> PathBuf {
-        Self::home().join(&self.relative_skills_dir)
+    fn candidate_paths(relative: &str) -> Vec<PathBuf> {
+        let mut candidates = vec![Self::home().join(relative)];
+
+        if let Some(suffix) = relative.strip_prefix(".config/") {
+            if let Some(config_dir) = dirs::config_dir() {
+                let config_path = config_dir.join(suffix);
+                if !candidates.contains(&config_path) {
+                    candidates.push(config_path);
+                }
+            }
+        }
+
+        candidates
     }
 
-    pub fn detect_dir(&self) -> PathBuf {
-        Self::home().join(&self.relative_detect_dir)
+    fn select_existing_or_default(paths: &[PathBuf]) -> PathBuf {
+        paths
+            .iter()
+            .find(|path| path.exists())
+            .cloned()
+            .unwrap_or_else(|| paths[0].clone())
+    }
+
+    pub fn skills_dir(&self) -> PathBuf {
+        let candidates = Self::candidate_paths(&self.relative_skills_dir);
+        Self::select_existing_or_default(&candidates)
     }
 
     pub fn is_installed(&self) -> bool {
-        self.detect_dir().exists()
+        Self::candidate_paths(&self.relative_detect_dir)
+            .iter()
+            .any(|path| path.exists())
     }
 }
 

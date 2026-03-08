@@ -34,11 +34,13 @@ export function Settings() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingRepo, setOpeningRepo] = useState(false);
   const [openingGithub, setOpeningGithub] = useState(false);
+  const [centralRepoPath, setCentralRepoPath] = useState("");
   const GITHUB_URL = "https://github.com/xingkongliang/skills-manager";
 
   useEffect(() => {
     api.getSettings("sync_mode").then((v) => { if (v) setSyncMode(v); });
     api.getSettings("default_scenario").then((v) => { if (v) setDefaultScenario(v); });
+    api.getCentralRepoPath().then(setCentralRepoPath).catch(() => {});
   }, []);
 
   const handleRefresh = async () => {
@@ -73,9 +75,9 @@ export function Settings() {
   const handleOpenRepoInFinder = async () => {
     try {
       setOpeningRepo(true);
-      await api.openCentralRepoInFinder();
+      await api.openCentralRepoFolder();
     } catch (error) {
-      console.error("Failed to open central repository in Finder", error);
+      console.error("Failed to open central repository folder", error);
       toast.error(t("common.error"));
     } finally {
       setOpeningRepo(false);
@@ -102,6 +104,9 @@ export function Settings() {
     { value: "dark", label: t("settings.themeDark"), icon: Moon },
     { value: "system", label: t("settings.themeSystem"), icon: Monitor },
   ];
+  const displayedRepoPath = centralRepoPath
+    ? centralRepoPath.replace(/\/Users\/[^/]+/, "~").replace(/\/home\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/, "~")
+    : "~/.skills-manager/";
 
   return (
     <div className="app-page app-page-narrow">
@@ -153,7 +158,7 @@ export function Settings() {
                     {agent.display_name}
                   </h3>
                   <p className="text-[9px] text-faint truncate" title={agent.skills_dir}>
-                    {agent.installed ? agent.skills_dir.replace(/\/Users\/[^/]+/, "~") : t("settings.notInstalled")}
+                    {agent.installed ? agent.skills_dir.replace(/\/Users\/[^/]+/, "~").replace(/\/home\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/, "~") : t("settings.notInstalled")}
                   </p>
                 </div>
               </div>
@@ -176,7 +181,7 @@ export function Settings() {
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center gap-1.5 bg-background border border-border-subtle rounded-[4px] px-2 py-1">
                   <Folder className="w-3 h-3 text-muted" />
-                  <span className="text-[11px] font-mono text-tertiary">~/.skills-manager/</span>
+                  <span className="text-[11px] font-mono text-tertiary">{displayedRepoPath}</span>
                 </div>
                 <button
                   type="button"

@@ -3,6 +3,18 @@ use git2::{Direction, Repository};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Create a `Command` for git that hides the console window on Windows.
+fn git_command() -> Command {
+    #[allow(unused_mut)]
+    let mut cmd = Command::new("git");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedGitSource {
     pub original_url: String,
@@ -27,7 +39,7 @@ pub fn clone_repo_ref(url: &str, branch: Option<&str>) -> Result<PathBuf> {
     let temp_dir = std::env::temp_dir().join(format!("skills-manager-clone-{}", uuid::Uuid::new_v4()));
 
     // Try system git first (faster, supports SSH)
-    let mut command = Command::new("git");
+    let mut command = git_command();
     command.arg("clone").arg("--depth").arg("1");
     if let Some(branch) = branch {
         command.arg("--branch").arg(branch);
@@ -58,7 +70,7 @@ pub fn clone_repo_ref(url: &str, branch: Option<&str>) -> Result<PathBuf> {
 }
 
 pub fn get_head_revision(repo_dir: &Path) -> Result<String> {
-    let output = Command::new("git")
+    let output = git_command()
         .arg("-C")
         .arg(repo_dir)
         .args(["rev-parse", "HEAD"])
@@ -103,7 +115,7 @@ pub fn resolve_remote_revision(url: &str, branch: Option<&str>) -> Result<String
 }
 
 pub fn checkout_revision(repo_dir: &Path, revision: &str) -> Result<()> {
-    let status = Command::new("git")
+    let status = git_command()
         .arg("-C")
         .arg(repo_dir)
         .args(["checkout", "--detach", revision])
@@ -221,7 +233,7 @@ fn resolve_remote_revision_with_git(url: &str, branch: Option<&str>) -> Result<S
     let target = branch
         .map(|branch| format!("refs/heads/{branch}"))
         .unwrap_or_else(|| "HEAD".to_string());
-    let output = Command::new("git")
+    let output = git_command()
         .args(["ls-remote", url, &target])
         .output()
         .with_context(|| format!("Failed to query remote {}", url))?;

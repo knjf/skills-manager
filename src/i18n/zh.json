@@ -201,7 +201,7 @@
     "repoPath": "中央仓库路径",
     "repoPathDesc": "所有 Skills 和场景配置的默认存储位置。",
     "changeDir": "更改目录",
-    "openInFinder": "在 Finder 中打开",
+    "openInFinder": "打开文件夹",
     "syncMode": "默认同步模式",
     "syncModeDesc": "推荐使用符号链接，占用空间极小且修改可实时生效。",
     "symlink": "符号链接",
@@ -218,8 +218,8 @@
     "language": "语言 (Language)",
     "help": "帮助",
     "about": "关于",
-    "version": "Skills Manager 1.0.1",
-    "tagline": "Built for macOS. 极简、高效、无感多场景切换。"
+    "version": "Skills Manager 1.1.0",
+    "tagline": "跨平台。极简、高效、无感多场景切换。"
   },
   "common": {
     "loading": "加载中...",

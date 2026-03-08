@@ -64,6 +64,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Windows smoke check
+        if: matrix.platform == 'windows-latest'
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:

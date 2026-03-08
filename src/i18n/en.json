@@ -201,7 +201,7 @@
     "repoPath": "Central Repository Path",
     "repoPathDesc": "Default storage location for all Skills and scenario configs.",
     "changeDir": "Change Directory",
-    "openInFinder": "Open in Finder",
+    "openInFinder": "Open Folder",
     "syncMode": "Default Sync Mode",
     "syncModeDesc": "Symlinks are recommended — minimal disk usage with live updates.",
     "symlink": "Symlink",
@@ -218,8 +218,8 @@
     "language": "Language",
     "help": "Help",
     "about": "About",
-    "version": "Skills Manager 1.0.1",
-    "tagline": "Built for macOS. Minimal, efficient, seamless multi-scenario switching."
+    "version": "Skills Manager 1.1.0",
+    "tagline": "Cross-platform. Minimal, efficient, seamless multi-scenario switching."
   },
   "common": {
     "loading": "Loading...",

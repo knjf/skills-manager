@@ -161,8 +161,11 @@ export const getSettings = (key: string) =>
 export const setSettings = (key: string, value: string) =>
   invoke<void>("set_settings", { key, value });
 
-export const openCentralRepoInFinder = () =>
-  invoke<void>("open_central_repo_in_finder");
+export const getCentralRepoPath = () =>
+  invoke<string>("get_central_repo_path");
+
+export const openCentralRepoFolder = () =>
+  invoke<void>("open_central_repo_folder");
 
 // ── Scenarios ──
 

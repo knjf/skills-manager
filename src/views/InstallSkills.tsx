@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useDeferredValue, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   DownloadCloud,
   UploadCloud,
@@ -57,7 +57,14 @@ export function InstallSkills() {
   const [importingPaths, setImportingPaths] = useState<Set<string>>(new Set());
   const [importingAll, setImportingAll] = useState(false);
   const marketListRef = useRef<HTMLDivElement | null>(null);
-  const deferredMarketQuery = useDeferredValue(marketQuery);
+  const [debouncedMarketQuery, setDebouncedMarketQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMarketQuery(marketQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [marketQuery]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -90,7 +97,7 @@ export function InstallSkills() {
   useEffect(() => {
     if (activeTab !== "market") return;
 
-    const query = deferredMarketQuery.trim();
+    const query = debouncedMarketQuery.trim();
     const loadingMore = query.length > 0 && marketSkills.length > 0 && marketSearchLimit > marketSkills.length;
     setMarketLoadingMore(loadingMore);
     setMarketLoading(true);
@@ -99,28 +106,34 @@ export function InstallSkills() {
     }
     setMarketError(null);
 
+    let stale = false;
     const request = query
       ? api.searchSkillssh(query, marketSearchLimit)
       : api.fetchLeaderboard(marketTab);
 
     request
       .then((result) => {
+        if (stale) return;
         setMarketSkills(result);
         if (!loadingMore) {
           setMarketSourceFilter("all");
         }
       })
       .catch((e) => {
+        if (stale) return;
         console.error(e);
         const message = e?.toString?.() || t("common.error");
         setMarketError(message);
         toast.error(message);
       })
       .finally(() => {
+        if (stale) return;
         setMarketLoading(false);
         setMarketLoadingMore(false);
       });
-  }, [activeTab, deferredMarketQuery, marketReloadKey, marketSearchLimit, marketTab, t]);
+
+    return () => { stale = true; };
+  }, [activeTab, debouncedMarketQuery, marketReloadKey, marketSearchLimit, marketTab, t]);
 
   useEffect(() => {
     if (activeTab === "local" && !scanResult && !scanLoading) {
@@ -260,7 +273,7 @@ export function InstallSkills() {
     if (page === 1 || page === totalMarketPages) return true;
     return Math.abs(page - currentMarketPage) <= 1;
   });
-  const hasMarketQuery = deferredMarketQuery.trim().length > 0;
+  const hasMarketQuery = debouncedMarketQuery.trim().length > 0;
   const canLoadMoreSearch = hasMarketQuery && marketSkills.length >= marketSearchLimit;
   const isLoadingMoreSearch = hasMarketQuery && marketLoadingMore;
 
@@ -309,7 +322,7 @@ export function InstallSkills() {
                     <span className="text-faint">·</span>
                     <span>
                       {hasMarketQuery
-                        ? t("install.marketMode.search", { query: deferredMarketQuery.trim() })
+                        ? t("install.marketMode.search", { query: debouncedMarketQuery.trim() })
                         : t(`install.marketMode.${marketTab}`)}
                     </span>
                     <span className="text-faint">·</span>

@@ -294,7 +294,7 @@ export function MySkills() {
           <button
             onClick={handleCheckAllUpdates}
             disabled={checkingAll}
-            className="mr-2 inline-flex items-center gap-1 rounded-md px-3 py-2 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+            className="mr-2 inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", checkingAll && "animate-spin")} />
             {t("mySkills.updateActions.checkAll")}
@@ -324,7 +324,7 @@ export function MySkills() {
         <div className="flex flex-1 flex-col items-center justify-center pb-20 text-center">
           <Layers className="mb-4 h-12 w-12 text-faint" />
           <h3 className="mb-1.5 text-[14px] font-semibold text-tertiary">{t("mySkills.noSkills")}</h3>
-          <p className="text-[13px] text-faint">
+          <p className="text-[13px] text-muted">
             {skills.length === 0 ? t("mySkills.addFirst") : t("mySkills.noMatch")}
           </p>
         </div>
@@ -397,14 +397,14 @@ export function MySkills() {
                   </div>
 
                   <div className="px-3.5 pb-3">
-                    <p className="text-[12px] leading-[18px] text-muted truncate">
+                    <p className="text-[13px] leading-[18px] text-muted truncate">
                       {skill.description || "—"}
                     </p>
                     {badge && (
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <span
                           className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                            "rounded-full px-2 py-0.5 text-[13px] font-medium",
                             badge.className
                           )}
                         >
@@ -416,14 +416,14 @@ export function MySkills() {
 
                   <div className="mt-auto flex items-center justify-between gap-2 border-t border-border-subtle px-3.5 py-2.5">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-faint">
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-muted">
                         {sourceIcon(skill.source_type)}
                         {sourceTypeLabel(skill)}
                       </span>
                       {enabledInScenario && (
                         <>
                           <span className="text-faint">·</span>
-                          <span className="truncate text-[11px] font-medium text-amber-600 dark:text-amber-400/80">
+                          <span className="truncate text-[13px] font-medium text-amber-600 dark:text-amber-400/80">
                             {activeScenarioName}
                           </span>
                         </>
@@ -434,7 +434,7 @@ export function MySkills() {
                         onClick={() => handleToggleScenario(skill)}
                         disabled={!activeScenario}
                         className={cn(
-                          "rounded px-2 py-1 text-[12px] font-medium transition-colors outline-none",
+                          "rounded px-2 py-1 text-[13px] font-medium transition-colors outline-none",
                           enabledInScenario
                             ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
                             : "text-muted hover:bg-surface-hover hover:text-secondary"
@@ -470,17 +470,17 @@ export function MySkills() {
                   {skill.name}
                 </h3>
 
-                <p className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
                   {skill.description || "—"}
                 </p>
 
                 <div className="flex shrink-0 items-center gap-2.5">
-                  <span className="inline-flex items-center gap-1 text-[11px] text-faint">
+                  <span className="inline-flex items-center gap-1 text-[13px] text-muted">
                     {sourceIcon(skill.source_type)}
                     {sourceTypeLabel(skill)}
                   </span>
                   {enabledInScenario && (
-                    <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400/80">
+                    <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400/80">
                       {activeScenarioName}
                     </span>
                   )}
@@ -491,7 +491,7 @@ export function MySkills() {
                     onClick={() => handleToggleScenario(skill)}
                     disabled={!activeScenario}
                     className={cn(
-                      "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                      "rounded px-2 py-0.5 text-[13px] font-medium transition-colors outline-none",
                       enabledInScenario
                         ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
                         : "text-muted hover:bg-surface-hover hover:text-secondary"

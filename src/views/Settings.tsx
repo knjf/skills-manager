@@ -97,7 +97,7 @@ export function Settings() {
   };
 
   const selectClass =
-    "h-10 rounded-lg border border-border-subtle bg-background px-3 text-[12px] text-secondary outline-none transition-colors focus:border-border";
+    "h-10 rounded-lg border border-border-subtle bg-background px-3 text-[13px] text-secondary outline-none transition-colors focus:border-border";
 
   const themeOptions: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
     { value: "light", label: t("settings.themeLight"), icon: Sun },
@@ -127,7 +127,7 @@ export function Settings() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1.5 text-[11px] text-accent hover:text-accent-light transition-colors font-medium outline-none"
+              className="flex items-center gap-1.5 text-[13px] text-accent hover:text-accent-light transition-colors font-medium outline-none"
             >
               {refreshing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -154,10 +154,10 @@ export function Settings() {
                   <Circle className="w-3.5 h-3.5 text-faint shrink-0" />
                 )}
                 <div className="min-w-0">
-                  <h3 className={cn("text-[11px] font-medium truncate", agent.installed ? "text-secondary" : "text-muted")}>
+                  <h3 className={cn("text-[13px] font-medium truncate", agent.installed ? "text-secondary" : "text-muted")}>
                     {agent.display_name}
                   </h3>
-                  <p className="text-[10px] text-muted truncate" title={agent.skills_dir}>
+                  <p className="text-[13px] text-muted truncate" title={agent.skills_dir}>
                     {agent.installed ? agent.skills_dir.replace(/\/Users\/[^/]+/, "~").replace(/\/home\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/, "~") : t("settings.notInstalled")}
                   </p>
                 </div>
@@ -175,20 +175,20 @@ export function Settings() {
             {/* Repo path */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="text-[12px] text-secondary font-medium mb-0.5">{t("settings.repoPath")}</h3>
-                <p className="text-[11px] text-muted">{t("settings.repoPathDesc")}</p>
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.repoPath")}</h3>
+                <p className="text-[13px] text-muted">{t("settings.repoPathDesc")}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center gap-1.5 bg-background border border-border-subtle rounded-[4px] px-2 py-1">
                   <Folder className="w-3 h-3 text-muted" />
-                  <span className="text-[11px] font-mono text-tertiary">{displayedRepoPath}</span>
+                  <span className="text-[13px] font-mono text-tertiary">{displayedRepoPath}</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleOpenRepoInFinder}
                   disabled={openingRepo}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-[4px] border px-2.5 py-1 text-[11px] font-medium transition-all outline-none",
+                    "inline-flex items-center gap-1 rounded-[4px] border px-2.5 py-1 text-[13px] font-medium transition-all outline-none",
                     "border-accent-border bg-accent-bg text-accent",
                     "hover:border-accent hover:bg-accent-bg",
                     openingRepo && "cursor-wait opacity-70"
@@ -207,14 +207,14 @@ export function Settings() {
             {/* Sync mode */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-[12px] text-secondary font-medium mb-0.5">{t("settings.syncMode")}</h3>
-                <p className="text-[11px] text-muted">{t("settings.syncModeDesc")}</p>
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.syncMode")}</h3>
+                <p className="text-[13px] text-muted">{t("settings.syncModeDesc")}</p>
               </div>
               <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
                 <button
                   onClick={() => handleSyncModeChange("symlink")}
                   className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[13px] font-medium transition-colors outline-none",
                     syncMode === "symlink" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
                   )}
                 >
@@ -223,7 +223,7 @@ export function Settings() {
                 <button
                   onClick={() => handleSyncModeChange("copy")}
                   className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[13px] font-medium transition-colors outline-none",
                     syncMode === "copy" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
                   )}
                 >
@@ -235,8 +235,8 @@ export function Settings() {
             {/* Theme */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-[12px] text-secondary font-medium mb-0.5">{t("settings.theme")}</h3>
-                <p className="text-[11px] text-muted">{t("settings.themeDesc")}</p>
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.theme")}</h3>
+                <p className="text-[13px] text-muted">{t("settings.themeDesc")}</p>
               </div>
               <div className="flex bg-background border border-border-subtle rounded-[4px] p-px shrink-0">
                 {themeOptions.map((opt) => {
@@ -246,7 +246,7 @@ export function Settings() {
                       key={opt.value}
                       onClick={() => setTheme(opt.value)}
                       className={cn(
-                        "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[11px] font-medium transition-colors outline-none",
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] text-[13px] font-medium transition-colors outline-none",
                         theme === opt.value ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
                       )}
                     >
@@ -260,8 +260,8 @@ export function Settings() {
             {/* Current scenario */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-[12px] text-secondary font-medium mb-0.5">{t("settings.currentScenario")}</h3>
-                <p className="text-[11px] text-muted">{t("settings.currentScenarioDesc")}</p>
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.currentScenario")}</h3>
+                <p className="text-[13px] text-muted">{t("settings.currentScenarioDesc")}</p>
               </div>
               <select
                 value={activeScenario?.id || ""}
@@ -278,8 +278,8 @@ export function Settings() {
             {/* Default scenario */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-[12px] text-secondary font-medium mb-0.5">{t("settings.defaultScenario")}</h3>
-                <p className="text-[11px] text-muted">{t("settings.defaultScenarioDesc")}</p>
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">{t("settings.defaultScenario")}</h3>
+                <p className="text-[13px] text-muted">{t("settings.defaultScenarioDesc")}</p>
               </div>
               <select
                 value={defaultScenario}
@@ -296,7 +296,7 @@ export function Settings() {
             {/* Language */}
             <div className="px-4 py-3 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-[12px] text-secondary font-medium">{t("settings.language")}</h3>
+                <h3 className="text-[13px] text-secondary font-medium">{t("settings.language")}</h3>
               </div>
               <div className="flex items-center gap-2">
                 <Globe className="w-3.5 h-3.5 text-muted" />
@@ -322,14 +322,14 @@ export function Settings() {
               </div>
               <div>
                 <h3 className="text-[13px] font-semibold text-primary">{t("settings.version")}</h3>
-                <p className="text-muted text-[11px]">{t("settings.tagline")}</p>
+                <p className="text-muted text-[13px]">{t("settings.tagline")}</p>
               </div>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={openHelp}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[11px] font-medium transition-colors border border-border outline-none"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[13px] font-medium transition-colors border border-border outline-none"
               >
                 <BookOpen className="w-3 h-3" /> {t("settings.help")}
               </button>
@@ -337,7 +337,7 @@ export function Settings() {
                 type="button"
                 onClick={handleOpenGithub}
                 disabled={openingGithub}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[11px] font-medium transition-colors border border-border outline-none disabled:opacity-60"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[4px] bg-surface-hover hover:bg-surface-active text-tertiary text-[13px] font-medium transition-colors border border-border outline-none disabled:opacity-60"
               >
                 <Github className="w-3 h-3" /> GitHub
               </button>

@@ -63,7 +63,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
           <div className="min-w-0 mr-3">
             <h2 className="text-[14px] font-semibold text-primary truncate">{skill.name}</h2>
             {skill.description && (
-              <p className="text-[12px] text-muted mt-0.5 line-clamp-2">{skill.description}</p>
+              <p className="text-[13px] text-muted mt-0.5 line-clamp-2">{skill.description}</p>
             )}
           </div>
           <button
@@ -74,7 +74,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
           </button>
         </div>
 
-        <div className="flex items-center gap-4 border-b border-border-subtle px-5 py-2.5 text-[11px] text-muted">
+        <div className="flex items-center gap-4 border-b border-border-subtle px-5 py-2.5 text-[13px] text-muted">
           <div className="flex items-center gap-1.5">
             <FileText className="w-3 h-3" />
             {doc?.filename || "—"}
@@ -86,7 +86,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
         </div>
 
         {syncMeta && onSync && (
-          <div className="flex items-center justify-between border-b border-border-subtle px-5 py-2 text-[11px]">
+          <div className="flex items-center justify-between border-b border-border-subtle px-5 py-2 text-[13px]">
             <div className="flex items-center gap-2 text-muted">
               {syncMeta.syncedToolKeys.length > 0 ? (
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -109,7 +109,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
                   onClick={() => onSync("sync")}
                   disabled={syncing}
                   className={cn(
-                    "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                    "rounded px-2 py-0.5 text-[13px] font-medium transition-colors outline-none",
                     "text-muted hover:bg-surface-hover hover:text-secondary",
                     syncing && "opacity-50"
                   )}
@@ -122,7 +122,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
                   onClick={() => onSync("unsync")}
                   disabled={syncing}
                   className={cn(
-                    "rounded px-2 py-0.5 text-[11px] font-medium transition-colors outline-none",
+                    "rounded px-2 py-0.5 text-[13px] font-medium transition-colors outline-none",
                     "text-faint hover:bg-red-500/10 hover:text-red-400",
                     syncing && "opacity-50"
                   )}
@@ -136,7 +136,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 scrollbar-hide">
           {loading ? (
-            <div className="text-[12px] text-muted text-center mt-12">{t("common.loading")}</div>
+            <div className="text-[13px] text-muted text-center mt-12">{t("common.loading")}</div>
           ) : doc ? (
             <article className="mx-auto w-full max-w-[1240px] text-[13px] leading-6 text-secondary">
               <ReactMarkdown
@@ -196,7 +196,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
                     const isBlock = String(className || "").includes("language-");
                     if (isBlock) {
                       return (
-                        <code className={cn("block text-[12px] leading-6 text-secondary", className)} {...props}>
+                        <code className={cn("block text-[13px] leading-6 text-secondary", className)} {...props}>
                           {children}
                         </code>
                       );
@@ -205,7 +205,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
                     return (
                       <code
                         className={cn(
-                          "rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[12px] text-accent-light",
+                          "rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[13px] text-accent-light",
                           className
                         )}
                         {...props}
@@ -225,7 +225,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
                   ),
                   table: ({ className, ...props }) => (
                     <div className="mb-4 overflow-x-auto rounded-xl border border-border-subtle">
-                      <table className={cn("min-w-full border-collapse text-left text-[12px]", className)} {...props} />
+                      <table className={cn("min-w-full border-collapse text-left text-[13px]", className)} {...props} />
                     </div>
                   ),
                   thead: ({ className, ...props }) => (
@@ -243,7 +243,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
               </ReactMarkdown>
             </article>
           ) : (
-            <div className="text-[12px] text-muted text-center mt-12">{t("common.documentMissing")}</div>
+            <div className="text-[13px] text-muted text-center mt-12">{t("common.documentMissing")}</div>
           )}
         </div>
       </div>

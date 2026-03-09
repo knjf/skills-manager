@@ -33,7 +33,7 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
     }
   };
 
-  const inputClass = "w-full bg-background border border-border-subtle rounded-[4px] px-3 py-2 text-[12px] text-secondary focus:outline-none focus:border-border transition-all placeholder-faint";
+  const inputClass = "w-full bg-background border border-border-subtle rounded-[4px] px-3 py-2 text-[13px] text-secondary focus:outline-none focus:border-border transition-all placeholder-faint";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -48,7 +48,7 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
 
         <div className="space-y-3">
           <div>
-            <label className="block text-[11px] font-medium text-tertiary mb-1">{t("scenario.name")}</label>
+            <label className="block text-[13px] font-medium text-tertiary mb-1">{t("scenario.name")}</label>
             <input
               type="text"
               value={name}
@@ -60,7 +60,7 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-tertiary mb-1">{t("scenario.description")}</label>
+            <label className="block text-[13px] font-medium text-tertiary mb-1">{t("scenario.description")}</label>
             <input
               type="text"
               value={description}
@@ -70,7 +70,7 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-tertiary mb-1.5">{t("scenario.icon")}</label>
+            <label className="block text-[13px] font-medium text-tertiary mb-1.5">{t("scenario.icon")}</label>
             <div className="grid grid-cols-5 gap-1.5">
               {SCENARIO_ICON_OPTIONS.map((option) => {
                 const Icon = option.icon;
@@ -97,14 +97,14 @@ export function CreateScenarioDialog({ open, onClose, onCreate }: Props) {
           <div className="flex justify-end gap-2 pt-1">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-[4px] text-[12px] font-medium text-tertiary hover:text-secondary hover:bg-surface-hover transition-colors outline-none"
+              className="px-3 py-1.5 rounded-[4px] text-[13px] font-medium text-tertiary hover:text-secondary hover:bg-surface-hover transition-colors outline-none"
             >
               {t("common.cancel")}
             </button>
             <button
               onClick={handleCreate}
               disabled={!name.trim() || loading}
-              className="px-3 py-1.5 rounded-[4px] bg-accent-dark hover:bg-accent text-white text-[12px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-accent-border outline-none"
+              className="px-3 py-1.5 rounded-[4px] bg-accent-dark hover:bg-accent text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-accent-border outline-none"
             >
               {loading ? t("common.loading") : t("common.create")}
             </button>

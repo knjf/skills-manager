@@ -32,7 +32,7 @@ export function Dashboard() {
         <p className="app-page-subtitle flex items-center gap-2 flex-wrap text-tertiary">
           {t("dashboard.currentScenario")}：
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${scenarioIcon.activeClass} ${scenarioIcon.colorClass}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium ${scenarioIcon.activeClass} ${scenarioIcon.colorClass}`}
           >
             <ScenarioIcon className="h-3 w-3" />
             {activeScenario?.name || "—"}
@@ -118,17 +118,17 @@ export function Dashboard() {
                 className="flex items-center justify-between px-3.5 py-2.5 hover:bg-surface-hover transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[11px] font-semibold bg-accent-bg text-accent-light shrink-0">
+                  <div className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[13px] font-semibold bg-accent-bg text-accent-light shrink-0">
                     {skill.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h4 className="text-[12px] text-secondary font-medium flex items-center gap-1.5">
+                    <h4 className="text-[13px] text-secondary font-medium flex items-center gap-1.5">
                       {skill.name}
                       <span className="text-[9px] px-1.5 py-px rounded bg-surface-hover text-muted border border-border font-normal">
                         {skill.source_type}
                       </span>
                     </h4>
-                    <p className="text-[11px] text-muted mt-px">
+                    <p className="text-[13px] text-muted mt-px">
                       {skill.targets.length > 0
                         ? `${t("dashboard.synced")} → ${skill.targets.map((t) => t.tool).join(", ")}`
                         : "未同步"}

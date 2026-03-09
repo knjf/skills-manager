@@ -52,13 +52,13 @@ export function ConfirmDialog({
           </button>
         </div>
 
-        <p className="text-[12px] text-tertiary mb-5">{message}</p>
+        <p className="text-[13px] text-tertiary mb-5">{message}</p>
         {details && details.length > 0 ? (
           <div className="mb-5 flex flex-wrap gap-2">
             {details.map((detail) => (
               <span
                 key={detail}
-                className="rounded-full border border-border-subtle bg-bg-secondary px-2.5 py-1 text-[11px] text-secondary"
+                className="rounded-full border border-border-subtle bg-bg-secondary px-2.5 py-1 text-[13px] text-secondary"
               >
                 {detail}
               </span>
@@ -69,7 +69,7 @@ export function ConfirmDialog({
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-[4px] text-[12px] font-medium text-tertiary hover:text-secondary hover:bg-surface-hover transition-colors outline-none"
+            className="px-3 py-1.5 rounded-[4px] text-[13px] font-medium text-tertiary hover:text-secondary hover:bg-surface-hover transition-colors outline-none"
           >
             {t("common.cancel")}
           </button>
@@ -78,8 +78,8 @@ export function ConfirmDialog({
             disabled={loading}
             className={
               tone === "warning"
-                ? "px-3 py-1.5 rounded-[4px] bg-accent-dark hover:bg-accent text-white text-[12px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-accent-border outline-none"
-                : "px-3 py-1.5 rounded-[4px] bg-red-600/90 hover:bg-red-500 text-white text-[12px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-red-500/50 outline-none"
+                ? "px-3 py-1.5 rounded-[4px] bg-accent-dark hover:bg-accent text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-accent-border outline-none"
+                : "px-3 py-1.5 rounded-[4px] bg-red-600/90 hover:bg-red-500 text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-red-500/50 outline-none"
             }
           >
             {loading ? t("common.loading") : confirmLabel || t("common.delete")}

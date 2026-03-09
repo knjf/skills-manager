@@ -136,7 +136,7 @@ export function Sidebar() {
 
         {/* Scenarios */}
         <div className="px-2.5 flex-1 overflow-y-auto scrollbar-hide min-h-0">
-          <div className="text-[11px] font-semibold text-muted mb-1.5 px-2.5 tracking-[0.1em] uppercase">
+          <div className="text-[13px] font-semibold text-muted mb-1.5 px-2.5 tracking-[0.1em] uppercase">
             {t("sidebar.scenarios")}
           </div>
           <div className="space-y-0.5">
@@ -173,10 +173,10 @@ export function Sidebar() {
                     {scenario.skill_count > 0 && (
                       <span
                         className={cn(
-                          "rounded-full px-1.5 text-[11px] font-medium leading-[18px]",
+                          "rounded-full px-1.5 text-[13px] font-medium leading-[18px]",
                           isActive
                             ? "bg-accent-bg text-accent-light"
-                            : "bg-surface-hover text-faint group-hover:bg-surface-active"
+                            : "bg-surface-hover text-muted group-hover:bg-surface-active"
                         )}
                       >
                         {scenario.skill_count}

@@ -81,6 +81,8 @@ pub fn run() {
             commands::projects::get_project_skill_document,
             commands::projects::import_project_skill_to_center,
             commands::projects::export_skill_to_project,
+            commands::projects::update_project_skill_to_center,
+            commands::projects::update_project_skill_from_center,
             commands::projects::toggle_project_skill,
             commands::projects::delete_project_skill,
             commands::projects::slugify_skill_names,

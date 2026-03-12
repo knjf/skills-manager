@@ -97,6 +97,8 @@ export interface ProjectSkill {
   files: string[];
   enabled: boolean;
   in_center: boolean;
+  sync_status: "project_only" | "in_sync" | "project_newer" | "center_newer" | "diverged";
+  center_skill_id: string | null;
 }
 
 export interface ProjectSkillDocument {
@@ -306,6 +308,12 @@ export const importProjectSkillToCenter = (projectId: string, skillDirName: stri
 
 export const exportSkillToProject = (skillId: string, projectId: string) =>
   invoke<void>("export_skill_to_project", { skillId, projectId });
+
+export const updateProjectSkillToCenter = (projectId: string, skillDirName: string) =>
+  invoke<void>("update_project_skill_to_center", { projectId, skillDirName });
+
+export const updateProjectSkillFromCenter = (projectId: string, skillDirName: string) =>
+  invoke<void>("update_project_skill_from_center", { projectId, skillDirName });
 
 export const toggleProjectSkill = (projectId: string, skillDirName: string, enabled: boolean) =>
   invoke<void>("toggle_project_skill", { projectId, skillDirName, enabled });

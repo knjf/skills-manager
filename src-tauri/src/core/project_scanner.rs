@@ -13,6 +13,12 @@ pub struct ProjectSkillInfo {
     pub enabled: bool,
     #[serde(default)]
     pub in_center: bool,
+    #[serde(default)]
+    pub sync_status: String,
+    #[serde(default)]
+    pub center_skill_id: Option<String>,
+    #[serde(skip_serializing)]
+    pub last_modified_at: Option<i64>,
     #[serde(skip_serializing)]
     pub content_hash: Option<String>,
 }
@@ -63,6 +69,9 @@ fn read_skills_from_dir(dir: &Path, enabled: bool, skills: &mut Vec<ProjectSkill
                 files,
                 enabled,
                 in_center: false,
+                sync_status: "project_only".to_string(),
+                center_skill_id: None,
+                last_modified_at: latest_modified_millis(&path),
                 content_hash: content_hash::hash_directory(&path).ok(),
             });
         }
@@ -122,4 +131,35 @@ fn list_files(dir: &Path) -> Vec<String> {
     }
     files.sort();
     files
+}
+
+fn latest_modified_millis(dir: &Path) -> Option<i64> {
+    fn walk(path: &Path, current: &mut Option<i64>) {
+        let Ok(meta) = std::fs::metadata(path) else {
+            return;
+        };
+        if let Ok(modified) = meta.modified() {
+            if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                let ts = duration.as_millis() as i64;
+                if current.map_or(true, |value| ts > value) {
+                    *current = Some(ts);
+                }
+            }
+        }
+
+        if !meta.is_dir() {
+            return;
+        }
+
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return;
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            walk(&entry.path(), current);
+        }
+    }
+
+    let mut latest = None;
+    walk(dir, &mut latest);
+    latest
 }

@@ -9,6 +9,7 @@ import {
   FileText,
   Download,
   Upload,
+  RotateCcw,
   Layers,
   X,
   Loader2,
@@ -24,6 +25,36 @@ import { cn } from "../utils";
 import * as api from "../lib/tauri";
 import type { ProjectSkill, ManagedSkill } from "../lib/tauri";
 
+function getSyncStatusMeta(t: (key: string) => string, status: ProjectSkill["sync_status"]) {
+  switch (status) {
+    case "in_sync":
+      return {
+        label: t("project.syncStatus.inSync"),
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      };
+    case "project_newer":
+      return {
+        label: t("project.syncStatus.projectNewer"),
+        className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+      };
+    case "center_newer":
+      return {
+        label: t("project.syncStatus.centerNewer"),
+        className: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+      };
+    case "diverged":
+      return {
+        label: t("project.syncStatus.diverged"),
+        className: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+      };
+    default:
+      return {
+        label: t("project.syncStatus.projectOnly"),
+        className: "bg-surface-hover text-muted",
+      };
+  }
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -37,7 +68,8 @@ export function ProjectDetail() {
   const [detailSkill, setDetailSkill] = useState<ProjectSkill | null>(null);
   const [docContent, setDocContent] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(false);
-  const [importingSkill, setImportingSkill] = useState<string | null>(null);
+  const [updatingCenterSkill, setUpdatingCenterSkill] = useState<string | null>(null);
+  const [updatingProjectSkill, setUpdatingProjectSkill] = useState<string | null>(null);
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProjectSkill | null>(null);
@@ -96,17 +128,35 @@ export function ProjectDetail() {
     }
   };
 
-  const handleImportToCenter = async (skill: ProjectSkill) => {
+  const handleUpdateCenter = async (skill: ProjectSkill) => {
     if (!id) return;
-    setImportingSkill(skill.dir_name);
+    setUpdatingCenterSkill(skill.dir_name);
     try {
-      await api.importProjectSkillToCenter(id, skill.dir_name);
-      toast.success(t("project.importToCenterSuccess", { name: skill.name }));
+      await api.updateProjectSkillToCenter(id, skill.dir_name);
+      toast.success(t("project.updateCenterSuccess", { name: skill.name }));
       await Promise.all([refreshManagedSkills(), refreshScenarios(), loadSkills()]);
     } catch (e: any) {
       toast.error(e.toString());
     } finally {
-      setImportingSkill(null);
+      setUpdatingCenterSkill(null);
+    }
+  };
+
+  const handleUpdateProject = async (skill: ProjectSkill) => {
+    if (!id) return;
+    setUpdatingProjectSkill(skill.dir_name);
+    try {
+      await api.updateProjectSkillFromCenter(id, skill.dir_name);
+      if (skill.sync_status === "project_newer") {
+        toast.success(t("project.resetFromCenterSuccess", { name: skill.name }));
+      } else {
+        toast.success(t("project.updateProjectSuccess", { name: skill.name }));
+      }
+      await loadSkills();
+    } catch (e: any) {
+      toast.error(e.toString());
+    } finally {
+      setUpdatingProjectSkill(null);
     }
   };
 
@@ -201,7 +251,7 @@ export function ProjectDetail() {
             className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary"
           >
             <Download className="h-3.5 w-3.5" />
-            {t("project.importFromCenter")}
+            {t("project.updateProject")}
           </button>
           <button
             onClick={loadSkills}
@@ -254,9 +304,18 @@ export function ProjectDetail() {
           )}
         >
           {filtered.map((skill) => {
-
-            const isImporting = importingSkill === skill.dir_name;
+            const isUpdatingCenter = updatingCenterSkill === skill.dir_name;
+            const isUpdatingProject = updatingProjectSkill === skill.dir_name;
             const isToggling = togglingSkill === skill.dir_name;
+            const canUpdateCenter =
+              skill.sync_status === "project_only" ||
+              skill.sync_status === "project_newer" ||
+              skill.sync_status === "diverged";
+            const canUpdateProject =
+              skill.sync_status === "project_newer" ||
+              skill.sync_status === "center_newer" ||
+              skill.sync_status === "diverged";
+            const statusMeta = getSyncStatusMeta(t, skill.sync_status);
 
             if (viewMode === "grid") {
               return (
@@ -292,11 +351,9 @@ export function ProjectDetail() {
 
                   <div className="mt-auto flex items-center justify-between gap-2 border-t border-border-subtle px-3.5 py-2.5">
                     <div className="flex items-center gap-1.5">
-                      {skill.in_center && (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
-                          {t("project.alreadyInCenter")}
-                        </span>
-                      )}
+                      <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", statusMeta.className)}>
+                        {statusMeta.label}
+                      </span>
                       {!skill.enabled && (
                         <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[12px] font-medium text-red-600 dark:text-red-300">
                           {t("project.disabled")}
@@ -304,17 +361,37 @@ export function ProjectDetail() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {!skill.in_center && (
+                      {canUpdateCenter && (
                         <button
-                          onClick={() => handleImportToCenter(skill)}
-                          disabled={isImporting}
+                          onClick={() => handleUpdateCenter(skill)}
+                          disabled={isUpdatingCenter || isUpdatingProject}
                           className="rounded px-2 py-1 text-[13px] font-medium text-muted transition-colors outline-none hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
-                          title={t("project.importToCenter")}
+                          title={t("project.updateCenter")}
                         >
-                          {isImporting ? (
+                          {isUpdatingCenter ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Upload className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
+                      {canUpdateProject && (
+                        <button
+                          onClick={() => handleUpdateProject(skill)}
+                          disabled={isUpdatingCenter || isUpdatingProject}
+                          className="rounded px-2 py-1 text-[13px] font-medium text-muted transition-colors outline-none hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                          title={
+                            skill.sync_status === "project_newer"
+                              ? t("project.resetFromCenter")
+                              : t("project.updateProject")
+                          }
+                        >
+                          {isUpdatingProject ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : skill.sync_status === "project_newer" ? (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
                           )}
                         </button>
                       )}
@@ -372,11 +449,9 @@ export function ProjectDetail() {
                 </p>
 
                 <div className="flex shrink-0 items-center gap-2.5">
-                  {skill.in_center && (
-                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
-                      {t("project.alreadyInCenter")}
-                    </span>
-                  )}
+                  <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", statusMeta.className)}>
+                    {statusMeta.label}
+                  </span>
                   {!skill.enabled && (
                     <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[12px] font-medium text-red-600 dark:text-red-300">
                       {t("project.disabled")}
@@ -391,17 +466,37 @@ export function ProjectDetail() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  {!skill.in_center && (
+                  {canUpdateCenter && (
                     <button
-                      onClick={() => handleImportToCenter(skill)}
-                      disabled={isImporting}
+                      onClick={() => handleUpdateCenter(skill)}
+                      disabled={isUpdatingCenter || isUpdatingProject}
                       className="rounded p-0.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
-                      title={t("project.importToCenter")}
+                      title={t("project.updateCenter")}
                     >
-                      {isImporting ? (
+                      {isUpdatingCenter ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                  {canUpdateProject && (
+                    <button
+                      onClick={() => handleUpdateProject(skill)}
+                      disabled={isUpdatingCenter || isUpdatingProject}
+                      className="rounded p-0.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                      title={
+                        skill.sync_status === "project_newer"
+                          ? t("project.resetFromCenter")
+                          : t("project.updateProject")
+                      }
+                    >
+                      {isUpdatingProject ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : skill.sync_status === "project_newer" ? (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
                       )}
                     </button>
                   )}

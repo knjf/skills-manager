@@ -100,6 +100,84 @@ fn slugify_skill_dir_name(name: &str) -> String {
     }
 }
 
+fn source_ref_matches_skill_path(skill_path: &str, skill_canonical: Option<&PathBuf>, managed: &SkillRecord) -> bool {
+    let Some(source_ref) = managed.source_ref.as_deref() else {
+        return false;
+    };
+    if source_ref == skill_path {
+        return true;
+    }
+    let Some(skill_canonical) = skill_canonical else {
+        return false;
+    };
+    let Ok(source_canonical) = std::fs::canonicalize(source_ref) else {
+        return false;
+    };
+    source_canonical == *skill_canonical
+}
+
+fn find_best_center_match<'a>(
+    skill: &project_scanner::ProjectSkillInfo,
+    all_managed: &'a [SkillRecord],
+) -> Option<&'a SkillRecord> {
+    let skill_hash = skill.content_hash.as_deref();
+    let canonical_skill_path = std::fs::canonicalize(&skill.path).ok();
+
+    all_managed
+        .iter()
+        .filter_map(|managed| {
+            if source_ref_matches_skill_path(&skill.path, canonical_skill_path.as_ref(), managed) {
+                return Some((managed, 3));
+            }
+            if skill_hash.is_some() && managed.content_hash.as_deref() == skill_hash {
+                return Some((managed, 2));
+            }
+            // Fallback for skills exported from center to project:
+            // project dir name is derived from managed skill name.
+            let managed_dir_name = slugify_skill_dir_name(&managed.name);
+            if managed_dir_name.eq_ignore_ascii_case(&skill.dir_name) {
+                return Some((managed, 1));
+            }
+            None
+        })
+        .max_by_key(|(_, score)| *score)
+        .map(|(managed, _)| managed)
+}
+
+fn find_source_ref_match<'a>(
+    skill: &project_scanner::ProjectSkillInfo,
+    all_managed: &'a [SkillRecord],
+) -> Option<&'a SkillRecord> {
+    find_best_center_match(skill, all_managed)
+}
+
+fn classify_sync_status(
+    skill: &project_scanner::ProjectSkillInfo,
+    managed: Option<&SkillRecord>,
+) -> String {
+    let Some(managed) = managed else {
+        return "project_only".to_string();
+    };
+
+    if skill.content_hash.is_some() && managed.content_hash.as_deref() == skill.content_hash.as_deref() {
+        return "in_sync".to_string();
+    }
+
+    let Some(project_modified_at) = skill.last_modified_at else {
+        return "diverged".to_string();
+    };
+
+    let center_updated_at = managed.updated_at;
+    let threshold_ms = 1_000;
+    if project_modified_at > center_updated_at + threshold_ms {
+        "project_newer".to_string()
+    } else if center_updated_at > project_modified_at + threshold_ms {
+        "center_newer".to_string()
+    } else {
+        "diverged".to_string()
+    }
+}
+
 #[tauri::command]
 pub fn get_projects(store: State<'_, Arc<SkillStore>>) -> Result<Vec<ProjectDto>, String> {
     let records = store.get_all_projects().map_err(|e| e.to_string())?;
@@ -162,25 +240,10 @@ pub fn get_project_skills(
     // Check which project skills are already in the central library
     let all_managed = store.get_all_skills().unwrap_or_default();
     for skill in &mut skills {
-        let canonical_skill_path = std::fs::canonicalize(&skill.path).ok();
-        let skill_hash = skill.content_hash.as_deref();
-        skill.in_center = all_managed.iter().any(|m| {
-            if skill_hash.is_some() && m.content_hash.as_deref() == skill_hash {
-                return true;
-            }
-            let Some(source_ref) = m.source_ref.as_deref() else {
-                return false;
-            };
-            if source_ref == skill.path {
-                return true;
-            }
-            if let Some(canonical_skill_path) = canonical_skill_path.as_ref() {
-                if let Ok(canonical_source_ref) = std::fs::canonicalize(source_ref) {
-                    return canonical_source_ref == *canonical_skill_path;
-                }
-            }
-            false
-        });
+        let matched = find_best_center_match(skill, &all_managed);
+        skill.in_center = matched.is_some();
+        skill.center_skill_id = matched.map(|m| m.id.clone());
+        skill.sync_status = classify_sync_status(skill, matched);
     }
 
     Ok(skills)
@@ -246,8 +309,26 @@ pub fn import_project_skill_to_center(
         .ok_or_else(|| "Skill not found in project".to_string())?;
 
     let source_path = PathBuf::from(&skill.path);
-    let result = installer::install_from_local(&source_path, Some(&skill.name))
-        .map_err(|e| e.to_string())?;
+    let all_managed = store.get_all_skills().unwrap_or_default();
+    if let Some(existing) = find_source_ref_match(skill, &all_managed) {
+        let result =
+            installer::install_from_local_to_destination(&source_path, Some(&existing.name), Path::new(&existing.central_path))
+                .map_err(|e| e.to_string())?;
+        store
+            .update_skill_after_install(
+                &existing.id,
+                &existing.name,
+                result.description.as_deref(),
+                existing.source_revision.as_deref(),
+                existing.remote_revision.as_deref(),
+                Some(&result.content_hash),
+                "local_only",
+            )
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let result = installer::install_from_local(&source_path, Some(&skill.name)).map_err(|e| e.to_string())?;
 
     let active = store.get_active_scenario_id().ok().flatten();
     let now = chrono::Utc::now().timestamp_millis();
@@ -284,6 +365,15 @@ pub fn import_project_skill_to_center(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn update_project_skill_to_center(
+    store: State<'_, Arc<SkillStore>>,
+    project_id: String,
+    skill_dir_name: String,
+) -> Result<(), String> {
+    import_project_skill_to_center(store, project_id, skill_dir_name)
 }
 
 #[tauri::command]
@@ -327,6 +417,46 @@ pub fn export_skill_to_project(
     sync_engine::sync_skill(&source, &target_dir, sync_engine::SyncMode::Copy)
         .map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_project_skill_from_center(
+    store: State<'_, Arc<SkillStore>>,
+    project_id: String,
+    skill_dir_name: String,
+) -> Result<(), String> {
+    ensure_safe_skill_dir_name(&skill_dir_name)?;
+
+    let record = store
+        .get_project_by_id(&project_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let skills = project_scanner::read_project_skills(Path::new(&record.path));
+    let skill = skills
+        .iter()
+        .find(|s| s.dir_name == skill_dir_name)
+        .ok_or_else(|| "Skill not found in project".to_string())?;
+
+    let all_managed = store.get_all_skills().unwrap_or_default();
+    let managed =
+        find_best_center_match(skill, &all_managed).ok_or_else(|| "No matching skill in center".to_string())?;
+
+    let claude_dir = Path::new(&record.path).join(".claude");
+    let skills_root = claude_dir.join("skills");
+    let disabled_root = claude_dir.join("skills-disabled");
+    let target_path = PathBuf::from(&skill.path);
+    if target_path.starts_with(&skills_root) {
+        ensure_dir_within_root(&target_path, &skills_root)?;
+    } else if target_path.starts_with(&disabled_root) {
+        ensure_dir_within_root(&target_path, &disabled_root)?;
+    } else {
+        return Err("Invalid skill directory path".to_string());
+    }
+
+    let source = PathBuf::from(&managed.central_path);
+    sync_engine::sync_skill(&source, &target_path, sync_engine::SyncMode::Copy).map_err(|e| e.to_string())?;
     Ok(())
 }
 

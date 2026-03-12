@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-12
+
+### Added
+- Git backup and sync for skill library with multi-machine sync support
+- Git sync controls (commit & push, pull) on My Skills page
+
+### Changed
+- Moved Git sync operations from Settings to My Skills page for easier access
+- Simplified Git backup UI by removing custom commit message input
+- Updated Git sync documentation to reflect new UI layout
+
 ## [1.1.3] - 2026-03-09
 
 ### Added

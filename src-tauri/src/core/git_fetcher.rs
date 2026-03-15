@@ -1,3 +1,4 @@
+use crate::core::skill_metadata;
 use anyhow::{Context, Result};
 use git2::{Direction, Repository};
 use std::path::{Path, PathBuf};
@@ -180,13 +181,25 @@ pub fn find_skill_dir(repo_dir: &Path, skill_id: Option<&str>) -> Result<PathBuf
             return Ok(in_skills);
         }
 
-        // Recursive search
+        // Recursive search: match by directory name or SKILL.md name field
+        let mut name_match: Option<PathBuf> = None;
         for entry in walkdir::WalkDir::new(repo_dir).max_depth(3) {
             if let Ok(e) = entry {
-                if e.file_type().is_dir() && e.file_name().to_string_lossy() == id {
-                    return Ok(e.path().to_path_buf());
+                if e.file_type().is_dir() {
+                    if e.file_name().to_string_lossy() == id {
+                        return Ok(e.path().to_path_buf());
+                    }
+                    if name_match.is_none() {
+                        let meta = skill_metadata::parse_skill_md(e.path());
+                        if meta.name.as_deref() == Some(id) {
+                            name_match = Some(e.path().to_path_buf());
+                        }
+                    }
                 }
             }
+        }
+        if let Some(path) = name_match {
+            return Ok(path);
         }
     }
 

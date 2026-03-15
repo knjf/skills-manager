@@ -31,7 +31,7 @@ export function AddProjectDialog({ open, onClose, onAdded }: Props) {
       await api.addProject(dir as string);
       await onAdded();
       onClose();
-    } catch (e) {
+    } catch {
       // error handled by toast in parent
     } finally {
       setAdding(false);

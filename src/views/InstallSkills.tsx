@@ -29,6 +29,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSearchParams } from "react-router-dom";
 import { listen } from "@tauri-apps/api/event";
 import { StatusBanner } from "../components/StatusBanner";
+import { getErrorMessage } from "../lib/error";
 
 const MARKET_PAGE_SIZE = 24;
 const MARKET_SEARCH_STEP = 60;
@@ -129,9 +130,9 @@ export function InstallSkills() {
     try {
       const result = await api.scanLocalSkills();
       setScanResult(result);
-    } catch (e: any) {
-      console.error(e);
-      const message = e?.toString?.() || t("common.error");
+    } catch (error: unknown) {
+      console.error(error);
+      const message = getErrorMessage(error, t("common.error"));
       setLocalError(message);
       toast.error(message);
     } finally {
@@ -236,8 +237,8 @@ export function InstallSkills() {
       });
       if (!selected) return;
       installLocalSource(selected as string);
-    } catch (e: any) {
-      const message = e?.toString?.() || t("common.error");
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t("common.error"));
       setLocalError(message);
       toast.error(message);
     }
@@ -251,8 +252,8 @@ export function InstallSkills() {
       });
       if (!selected) return;
       installLocalSource(selected as string);
-    } catch (e: any) {
-      const message = e?.toString?.() || t("common.error");
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t("common.error"));
       setLocalError(message);
       toast.error(message);
     }
@@ -281,8 +282,8 @@ export function InstallSkills() {
       await api.installFromSkillssh(skill.source, skill.skill_id);
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       toast.success(t("install.toast.success", { name: displayName }), { id: toastId });
-    } catch (e: any) {
-      const msg = e?.toString() || t("common.error");
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, t("common.error"));
       if (msg.includes("cancelled")) {
         toast.info(t("install.toast.cancelled"), { id: toastId });
       } else {
@@ -328,8 +329,8 @@ export function InstallSkills() {
       setGitName("");
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       toast.success(t("install.toast.success", { name: name || url }), { id: toastId });
-    } catch (e: any) {
-      const msg = e?.toString() || t("common.error");
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, t("common.error"));
       if (msg.includes("cancelled")) {
         toast.info(t("install.toast.cancelled"), { id: toastId });
       } else {
@@ -349,8 +350,8 @@ export function InstallSkills() {
       toast.success(t("install.scan.importedOne", { name }));
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       await runScan();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       setImportingPaths((prev) => {
         const next = new Set(prev);
@@ -367,8 +368,8 @@ export function InstallSkills() {
       toast.success(t("install.scan.importedAll"));
       await Promise.all([refreshScenarios(), refreshManagedSkills()]);
       await runScan();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       setImportingAll(false);
     }

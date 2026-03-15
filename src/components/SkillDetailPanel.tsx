@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText, Folder, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -25,20 +25,36 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
   const { t } = useTranslation();
   const [doc, setDoc] = useState<SkillDocument | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (!skill) {
-      setDoc(null);
-      return;
-    }
+    if (!skill) return;
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+
+    // Loading state is intentionally toggled when input skill changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     getSkillDocument(skill.id)
-      .then(setDoc)
-      .catch(() => setDoc(null))
-      .finally(() => setLoading(false));
+      .then((nextDoc) => {
+        if (requestId === requestIdRef.current) {
+          setDoc(nextDoc);
+        }
+      })
+      .catch(() => {
+        if (requestId === requestIdRef.current) {
+          setDoc(null);
+        }
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      });
   }, [skill]);
 
   if (!skill) return null;
+  const activeDoc = doc?.skill_id === skill.id ? doc : null;
 
   return createPortal(
     <div className="fixed inset-y-0 right-0 left-[220px] z-50 flex">
@@ -62,7 +78,7 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
         <div className="flex items-center gap-4 border-b border-border-subtle px-5 py-2.5 text-[13px] text-muted">
           <div className="flex items-center gap-1.5">
             <FileText className="w-3 h-3" />
-            {doc?.filename || "—"}
+            {activeDoc?.filename || "—"}
           </div>
           <div className="flex items-center gap-1.5 min-w-0">
             <Folder className="w-3 h-3 shrink-0" />
@@ -122,8 +138,8 @@ export function SkillDetailPanel({ skill, onClose, syncMeta, syncing, onSync }: 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 scrollbar-hide">
           {loading ? (
             <div className="text-[13px] text-muted text-center mt-12">{t("common.loading")}</div>
-          ) : doc ? (
-            <SkillMarkdown content={doc.content} />
+          ) : activeDoc ? (
+            <SkillMarkdown content={activeDoc.content} />
           ) : (
             <div className="text-[13px] text-muted text-center mt-12">{t("common.documentMissing")}</div>
           )}

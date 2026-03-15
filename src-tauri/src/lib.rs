@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tauri::Manager;
 
 mod commands;
 mod core;
@@ -20,6 +21,13 @@ pub fn run() {
     tauri::Builder::default()
         .manage(store)
         .manage(cancel_registry)
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())

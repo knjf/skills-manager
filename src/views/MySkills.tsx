@@ -26,6 +26,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { SkillDetailPanel } from "../components/SkillDetailPanel";
 import * as api from "../lib/tauri";
 import type { ManagedSkill, ToolInfo, GitBackupStatus } from "../lib/tauri";
+import { getErrorMessage } from "../lib/error";
 
 function getToolDisplayName(toolKey: string, tools: ToolInfo[]) {
   return tools.find((tool) => tool.key === toolKey)?.display_name || toolKey;
@@ -225,8 +226,8 @@ export function MySkills() {
             })
       );
       await refreshManagedSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
       await refreshManagedSkills();
     } finally {
       setSyncingSkillId(null);
@@ -260,8 +261,8 @@ export function MySkills() {
     try {
       await api.checkAllSkillUpdates(true);
       toast.success(t("mySkills.updateActions.checkedAll"));
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       await refreshManagedSkills();
       setCheckingAll(false);
@@ -273,8 +274,8 @@ export function MySkills() {
     try {
       await api.checkSkillUpdate(skill.id, true);
       await refreshManagedSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
       await refreshManagedSkills();
     } finally {
       setCheckingSkillId(null);
@@ -292,8 +293,8 @@ export function MySkills() {
         toast.success(t("mySkills.updateActions.updated"));
       }
       await refreshManagedSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
       await refreshManagedSkills();
     } finally {
       setUpdatingSkillId(null);
@@ -312,8 +313,8 @@ export function MySkills() {
       setTagEditSkillId(null);
       setTagInput("");
       await refreshManagedSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     }
   };
 
@@ -322,8 +323,8 @@ export function MySkills() {
       await api.setSkillTags(skill.id, skill.tags.filter((t) => t !== tagToRemove));
       toast.success(t("mySkills.tags.tagsUpdated"));
       await refreshManagedSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     }
   };
 

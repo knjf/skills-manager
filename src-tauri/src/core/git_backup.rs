@@ -283,7 +283,7 @@ fn merge_backup(backup: &Path, target: &Path) -> Result<()> {
             if entry.file_type()?.is_dir() {
                 copy_dir_all(&entry.path(), &dest)?;
             } else {
-                std::fs::copy(&entry.path(), &dest)?;
+                std::fs::copy(entry.path(), &dest)?;
             }
         }
     }

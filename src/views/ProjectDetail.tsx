@@ -24,6 +24,7 @@ import { SkillMarkdown } from "../components/SkillMarkdown";
 import { cn } from "../utils";
 import * as api from "../lib/tauri";
 import type { ProjectSkill, ManagedSkill } from "../lib/tauri";
+import { getErrorMessage } from "../lib/error";
 
 function getSyncStatusMeta(t: (key: string) => string, status: ProjectSkill["sync_status"]) {
   switch (status) {
@@ -135,8 +136,8 @@ export function ProjectDetail() {
       await api.updateProjectSkillToCenter(id, skill.dir_name);
       toast.success(t("project.updateCenterSuccess", { name: skill.name }));
       await Promise.all([refreshManagedSkills(), refreshScenarios(), loadSkills()]);
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       setUpdatingCenterSkill(null);
     }
@@ -153,8 +154,8 @@ export function ProjectDetail() {
         toast.success(t("project.updateProjectSuccess", { name: skill.name }));
       }
       await loadSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       setUpdatingProjectSkill(null);
     }
@@ -171,8 +172,8 @@ export function ProjectDetail() {
         toast.success(t("project.skillEnabled", { name: skill.name }));
       }
       await loadSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
       setTogglingSkill(null);
     }
@@ -185,8 +186,8 @@ export function ProjectDetail() {
       toast.success(t("project.importFromCenterSuccess", { name: managedSkill.name }));
       setShowExportDialog(false);
       await loadSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     }
   };
 
@@ -196,8 +197,8 @@ export function ProjectDetail() {
       await api.deleteProjectSkill(id, deleteTarget.dir_name);
       toast.success(t("project.skillDeleted", { name: deleteTarget.name }));
       await loadSkills();
-    } catch (e: any) {
-      toast.error(e.toString());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
     }
   };
 

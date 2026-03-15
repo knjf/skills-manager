@@ -7,7 +7,7 @@ interface SkillMarkdownProps {
   className?: string;
 }
 
-export function stripMarkdownFrontmatter(content: string) {
+function stripMarkdownFrontmatter(content: string) {
   if (!content.startsWith("---\n")) return content;
 
   const end = content.indexOf("\n---\n", 4);

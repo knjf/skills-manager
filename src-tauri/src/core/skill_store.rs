@@ -178,11 +178,12 @@ impl SkillStore {
             ",
         )?;
 
+        #[allow(clippy::let_and_return)]
         let has_icon_column = {
             let mut stmt = conn.prepare("PRAGMA table_info(scenarios)")?;
             let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-            let exists = rows.filter_map(|row| row.ok()).any(|name| name == "icon");
-            exists
+            let has_icon = rows.filter_map(|row| row.ok()).any(|name| name == "icon");
+            has_icon
         };
 
         if !has_icon_column {
@@ -349,6 +350,7 @@ impl SkillStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_skill_after_install(
         &self,
         id: &str,
@@ -380,6 +382,7 @@ impl SkillStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_skill_after_reinstall(
         &self,
         id: &str,

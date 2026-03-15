@@ -66,7 +66,7 @@ pub fn clone_repo_ref(
     if let Ok(mut child) = child {
         let deadline = Instant::now() + timeout;
         loop {
-            if cancel.map_or(false, |c| c.load(Ordering::SeqCst)) {
+            if cancel.is_some_and(|c| c.load(Ordering::SeqCst)) {
                 let _ = child.kill();
                 let _ = std::fs::remove_dir_all(&temp_dir);
                 anyhow::bail!("Installation cancelled");
@@ -156,10 +156,8 @@ pub fn resolve_remote_revision(url: &str, branch: Option<&str>) -> Result<String
         if let Some(head) = refs.iter().find(|head| head.name() == target) {
             return Ok(head.oid().to_string());
         }
-    } else {
-        if let Some(head) = refs.iter().find(|head| head.name() == "HEAD") {
-            return Ok(head.oid().to_string());
-        }
+    } else if let Some(head) = refs.iter().find(|head| head.name() == "HEAD") {
+        return Ok(head.oid().to_string());
     }
 
     anyhow::bail!("Unable to resolve remote revision for {}", url)
@@ -233,17 +231,15 @@ pub fn find_skill_dir(repo_dir: &Path, skill_id: Option<&str>) -> Result<PathBuf
 
         // Recursive search: match by directory name or SKILL.md name field
         let mut name_match: Option<PathBuf> = None;
-        for entry in walkdir::WalkDir::new(repo_dir).max_depth(3) {
-            if let Ok(e) = entry {
-                if e.file_type().is_dir() {
-                    if e.file_name().to_string_lossy() == id {
-                        return Ok(e.path().to_path_buf());
-                    }
-                    if name_match.is_none() {
-                        let meta = skill_metadata::parse_skill_md(e.path());
-                        if meta.name.as_deref() == Some(id) {
-                            name_match = Some(e.path().to_path_buf());
-                        }
+        for e in walkdir::WalkDir::new(repo_dir).max_depth(3).into_iter().flatten() {
+            if e.file_type().is_dir() {
+                if e.file_name().to_string_lossy() == id {
+                    return Ok(e.path().to_path_buf());
+                }
+                if name_match.is_none() {
+                    let meta = skill_metadata::parse_skill_md(e.path());
+                    if meta.name.as_deref() == Some(id) {
+                        name_match = Some(e.path().to_path_buf());
                     }
                 }
             }

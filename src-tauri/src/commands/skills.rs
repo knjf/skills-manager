@@ -164,18 +164,16 @@ pub async fn get_skill_document(
             }
         }
 
-        for entry in WalkDir::new(&central).max_depth(4) {
-            if let Ok(e) = entry {
-                let fname = e.file_name().to_string_lossy();
-                if candidates.contains(&fname.as_ref()) {
-                    let content = std::fs::read_to_string(e.path()).map_err(|e| e.to_string())?;
-                    return Ok(SkillDocumentDto {
-                        skill_id,
-                        filename: fname.to_string(),
-                        content,
-                        central_path: skill.central_path,
-                    });
-                }
+        for e in WalkDir::new(&central).max_depth(4).into_iter().flatten() {
+            let fname = e.file_name().to_string_lossy();
+            if candidates.contains(&fname.as_ref()) {
+                let content = std::fs::read_to_string(e.path()).map_err(|e| e.to_string())?;
+                return Ok(SkillDocumentDto {
+                    skill_id,
+                    filename: fname.to_string(),
+                    content,
+                    central_path: skill.central_path,
+                });
             }
         }
 

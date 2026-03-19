@@ -539,3 +539,96 @@ fn parse_restored_from_tag_message(message: &str) -> Option<String> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── redact_url ──
+
+    #[test]
+    fn redact_url_with_credentials() {
+        assert_eq!(
+            redact_url("https://user:token@github.com/acme/repo.git"),
+            "https://***@github.com/acme/repo.git"
+        );
+    }
+
+    #[test]
+    fn redact_url_with_token_only() {
+        assert_eq!(
+            redact_url("https://ghp_abc123@github.com/acme/repo.git"),
+            "https://***@github.com/acme/repo.git"
+        );
+    }
+
+    #[test]
+    fn redact_url_no_credentials_unchanged() {
+        assert_eq!(
+            redact_url("https://github.com/acme/repo.git"),
+            "https://github.com/acme/repo.git"
+        );
+    }
+
+    #[test]
+    fn redact_url_not_a_url_unchanged() {
+        assert_eq!(redact_url("just-a-string"), "just-a-string");
+    }
+
+    #[test]
+    fn redact_url_ssh_no_scheme_unchanged() {
+        assert_eq!(
+            redact_url("git@github.com:acme/repo.git"),
+            "git@github.com:acme/repo.git"
+        );
+    }
+
+    // ── redact_urls_in_text ──
+
+    #[test]
+    fn redact_urls_in_text_mixed_content() {
+        let input = "failed to push to https://user:pass@github.com/repo.git (error)";
+        let result = redact_urls_in_text(input);
+        assert!(result.contains("***@github.com/repo.git"));
+        assert!(!result.contains("user:pass"));
+    }
+
+    #[test]
+    fn redact_urls_in_text_no_urls() {
+        assert_eq!(redact_urls_in_text("plain text here"), "plain text here");
+    }
+
+    // ── parse_restored_from_tag_message ──
+
+    #[test]
+    fn parse_restored_tag_valid() {
+        let msg = "restore: switch skills library to sm-v-20260318-153012-abc1234";
+        assert_eq!(
+            parse_restored_from_tag_message(msg).as_deref(),
+            Some("sm-v-20260318-153012-abc1234")
+        );
+    }
+
+    #[test]
+    fn parse_restored_tag_invalid_prefix() {
+        assert_eq!(
+            parse_restored_from_tag_message("some other commit message"),
+            None
+        );
+    }
+
+    #[test]
+    fn parse_restored_tag_non_snapshot_tag() {
+        let msg = "restore: switch skills library to v1.0.0";
+        assert_eq!(parse_restored_from_tag_message(msg), None);
+    }
+
+    #[test]
+    fn parse_restored_tag_with_trailing_whitespace() {
+        let msg = "restore: switch skills library to sm-v-20260318-153012-abc1234  ";
+        assert_eq!(
+            parse_restored_from_tag_message(msg).as_deref(),
+            Some("sm-v-20260318-153012-abc1234")
+        );
+    }
+}

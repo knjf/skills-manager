@@ -314,7 +314,11 @@ fn resolve_remote_revision_with_git(url: &str, branch: Option<&str>) -> Result<S
 
 #[cfg(test)]
 mod tests {
-    use super::parse_git_source;
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    // ── parse_git_source ──
 
     #[test]
     fn parses_github_tree_urls() {
@@ -330,5 +334,172 @@ mod tests {
         assert_eq!(parsed.clone_url, "https://github.com/acme/skills.git");
         assert_eq!(parsed.branch, None);
         assert_eq!(parsed.subpath, None);
+    }
+
+    #[test]
+    fn parses_github_tree_url_branch_only() {
+        let parsed =
+            parse_git_source("https://github.com/acme/skills/tree/develop");
+        assert_eq!(parsed.clone_url, "https://github.com/acme/skills.git");
+        assert_eq!(parsed.branch.as_deref(), Some("develop"));
+        assert_eq!(parsed.subpath, None);
+    }
+
+    #[test]
+    fn parses_full_https_url() {
+        let parsed = parse_git_source("https://github.com/acme/skills.git");
+        assert_eq!(parsed.clone_url, "https://github.com/acme/skills.git");
+        assert_eq!(parsed.branch, None);
+        assert_eq!(parsed.subpath, None);
+    }
+
+    #[test]
+    fn parses_git_ssh_url() {
+        let parsed = parse_git_source("git@github.com:acme/skills.git");
+        assert_eq!(parsed.clone_url, "git@github.com:acme/skills.git");
+        assert_eq!(parsed.branch, None);
+        assert_eq!(parsed.subpath, None);
+    }
+
+    #[test]
+    fn preserves_original_url() {
+        let input = "  acme/skills  ";
+        let parsed = parse_git_source(input);
+        assert_eq!(parsed.original_url, "acme/skills");
+    }
+
+    #[test]
+    fn handles_plain_string_no_slash() {
+        let parsed = parse_git_source("something");
+        assert_eq!(parsed.clone_url, "something");
+    }
+
+    // ── normalize_url (tested through parse_git_source) ──
+
+    #[test]
+    fn normalize_http_url_passthrough() {
+        let parsed = parse_git_source("http://gitlab.example.com/repo.git");
+        assert_eq!(parsed.clone_url, "http://gitlab.example.com/repo.git");
+        assert_eq!(parsed.branch, None);
+    }
+
+    // ── find_skill_dir ──
+
+    #[test]
+    fn find_skill_dir_root_with_skill_md() {
+        let tmp = tempdir().unwrap();
+        fs::write(tmp.path().join("SKILL.md"), "---\nname: foo\n---").unwrap();
+
+        let found = find_skill_dir(tmp.path(), None).unwrap();
+        assert_eq!(found, tmp.path());
+    }
+
+    #[test]
+    fn find_skill_dir_root_with_claude_md() {
+        let tmp = tempdir().unwrap();
+        fs::write(tmp.path().join("CLAUDE.md"), "# instructions").unwrap();
+
+        let found = find_skill_dir(tmp.path(), None).unwrap();
+        assert_eq!(found, tmp.path());
+    }
+
+    #[test]
+    fn find_skill_dir_skills_subdirectory() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("skills")).unwrap();
+
+        let found = find_skill_dir(tmp.path(), None).unwrap();
+        assert_eq!(found, tmp.path().join("skills"));
+    }
+
+    #[test]
+    fn find_skill_dir_skill_subdirectory() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("skill")).unwrap();
+
+        let found = find_skill_dir(tmp.path(), None).unwrap();
+        assert_eq!(found, tmp.path().join("skill"));
+    }
+
+    #[test]
+    fn find_skill_dir_by_id_direct() {
+        let tmp = tempdir().unwrap();
+        let skill = tmp.path().join("my-skill");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "content").unwrap();
+
+        let found = find_skill_dir(tmp.path(), Some("my-skill")).unwrap();
+        assert_eq!(found, skill);
+    }
+
+    #[test]
+    fn find_skill_dir_by_id_in_skills_subdir() {
+        let tmp = tempdir().unwrap();
+        let skill = tmp.path().join("skills").join("my-skill");
+        fs::create_dir_all(&skill).unwrap();
+
+        let found = find_skill_dir(tmp.path(), Some("my-skill")).unwrap();
+        assert_eq!(found, skill);
+    }
+
+    #[test]
+    fn find_skill_dir_fallback_to_root() {
+        let tmp = tempdir().unwrap();
+        // Empty dir — no markers, no skills/ subdir
+        let found = find_skill_dir(tmp.path(), None).unwrap();
+        assert_eq!(found, tmp.path());
+    }
+
+    // ── relative_subpath ──
+
+    #[test]
+    fn relative_subpath_nested() {
+        let tmp = tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        let skill = repo.join("tools").join("my-skill");
+        assert_eq!(
+            relative_subpath(&repo, &skill)
+                .map(|s| s.replace('\\', "/")),
+            Some("tools/my-skill".to_string())
+        );
+    }
+
+    #[test]
+    fn relative_subpath_root_returns_none() {
+        let tmp = tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        assert_eq!(relative_subpath(&repo, &repo), None);
+    }
+
+    #[test]
+    fn relative_subpath_unrelated_returns_none() {
+        let tmp = tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        let other = tmp.path().join("other").join("skill");
+        assert_eq!(relative_subpath(&repo, &other), None);
+    }
+
+    // ── parse_github_tree_url (private, tested through parse_git_source) ──
+
+    #[test]
+    fn parse_github_tree_url_with_dot_git_suffix() {
+        // URL with .git before /tree should still parse
+        let parsed =
+            parse_git_source("https://github.com/acme/skills.git/tree/main/sub");
+        assert_eq!(parsed.clone_url, "https://github.com/acme/skills.git");
+        assert_eq!(parsed.branch.as_deref(), Some("main"));
+        assert_eq!(parsed.subpath.as_deref(), Some("sub"));
+    }
+
+    #[test]
+    fn parse_non_github_url_no_tree_extraction() {
+        let parsed =
+            parse_git_source("https://gitlab.com/acme/skills/tree/main/sub");
+        // Non-github — regex won't match, returned as-is
+        assert_eq!(
+            parsed.clone_url,
+            "https://gitlab.com/acme/skills/tree/main/sub"
+        );
+        assert_eq!(parsed.branch, None);
     }
 }

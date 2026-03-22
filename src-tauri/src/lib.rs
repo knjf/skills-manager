@@ -8,6 +8,7 @@ mod core;
 /// Shared flag: when true, CloseRequested should NOT be prevented.
 pub static QUITTING: AtomicBool = AtomicBool::new(false);
 const MAIN_TRAY_ID: &str = "main-tray";
+const CUSTOM_TRAY_ICON_BYTES: &[u8] = include_bytes!("../icons/tray/tray-icon-32.png");
 
 fn parse_bool_setting(value: Option<String>, default: bool) -> bool {
     match value.as_deref().map(str::trim).map(str::to_ascii_lowercase) {
@@ -67,6 +68,18 @@ fn request_quit(app: &tauri::AppHandle) {
     }
 }
 
+fn load_custom_tray_icon() -> Option<tauri::image::Image<'static>> {
+    let img =
+        image::load_from_memory_with_format(CUSTOM_TRAY_ICON_BYTES, image::ImageFormat::Png).ok()?;
+    let rgba = img.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    Some(tauri::image::Image::new_owned(
+        rgba.into_raw(),
+        width,
+        height,
+    ))
+}
+
 fn ensure_tray_icon(app: &tauri::AppHandle) -> tauri::Result<()> {
     if app.tray_by_id(MAIN_TRAY_ID).is_some() {
         return Ok(());
@@ -80,7 +93,6 @@ fn ensure_tray_icon(app: &tauri::AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
     let mut builder = TrayIconBuilder::with_id(MAIN_TRAY_ID)
-        .icon(app.default_window_icon().unwrap().clone())
         .tooltip("Skills Manager")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -94,6 +106,16 @@ fn ensure_tray_icon(app: &tauri::AppHandle) -> tauri::Result<()> {
             }
             _ => {}
         });
+
+    if let Some(icon) = load_custom_tray_icon().or_else(|| app.default_window_icon().cloned()) {
+        builder = builder.icon(icon);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Render the original white PNG directly for maximum brightness.
+        builder = builder.icon_as_template(false);
+    }
 
     // On macOS, left-click on tray icon opens the menu by default;
     // on Windows/Linux, left-click restores the window directly.

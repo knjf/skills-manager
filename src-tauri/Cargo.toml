@@ -42,6 +42,7 @@ urlencoding = "2"
 zip = "2"
 tempfile = "3.26.0"
 semver = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

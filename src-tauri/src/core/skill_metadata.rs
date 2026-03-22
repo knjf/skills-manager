@@ -62,7 +62,8 @@ pub fn is_valid_skill_dir(dir: &Path) -> bool {
 }
 
 /// Sanitize a skill name so it is safe to use as a single directory component.
-/// Strips path separators and `..` traversal, removes control characters.
+/// Strips path separators and `..` traversal, replaces unsafe characters with `-`.
+/// Only allows `[a-zA-Z0-9._-]` for cross-platform filesystem compatibility.
 /// Returns `None` if the result would be empty or unsafe.
 pub fn sanitize_skill_name(name: &str) -> Option<String> {
     // Take only the last path component — strips any leading `../` sequences.
@@ -76,13 +77,30 @@ pub fn sanitize_skill_name(name: &str) -> Option<String> {
         return None;
     }
 
-    // Remove NUL bytes and other control characters.
-    let clean: String = last.chars().filter(|c| !c.is_control()).collect();
+    // Replace any character outside the safe set with `-`, then collapse
+    // consecutive dashes and trim leading/trailing dashes.
+    let clean: String = last
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
 
-    if clean.is_empty() {
+    // Collapse consecutive dashes and trim edges.
+    let collapsed = clean
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+
+    if collapsed.is_empty() {
         None
     } else {
-        Some(clean)
+        Some(collapsed)
     }
 }
 
@@ -234,6 +252,48 @@ mod tests {
         let file = tmp.path().join("not-a-dir");
         fs::write(&file, "content").unwrap();
         assert!(!is_valid_skill_dir(&file));
+    }
+
+    // ── sanitize_skill_name ──
+
+    #[test]
+    fn sanitize_normal_name() {
+        assert_eq!(sanitize_skill_name("my-skill"), Some("my-skill".into()));
+    }
+
+    #[test]
+    fn sanitize_strips_path_traversal() {
+        assert_eq!(
+            sanitize_skill_name("../../../../.bashrc"),
+            Some(".bashrc".into())
+        );
+    }
+
+    #[test]
+    fn sanitize_rejects_dotdot() {
+        assert_eq!(sanitize_skill_name(".."), None);
+        assert_eq!(sanitize_skill_name("."), None);
+    }
+
+    #[test]
+    fn sanitize_replaces_spaces_and_special_chars() {
+        assert_eq!(
+            sanitize_skill_name("my skill (v2)"),
+            Some("my-skill-v2".into())
+        );
+    }
+
+    #[test]
+    fn sanitize_collapses_dashes() {
+        assert_eq!(
+            sanitize_skill_name("a---b   c"),
+            Some("a-b-c".into())
+        );
+    }
+
+    #[test]
+    fn sanitize_rejects_empty_after_cleaning() {
+        assert_eq!(sanitize_skill_name("   "), None);
     }
 
     // ── infer_skill_name ──

@@ -465,6 +465,10 @@ impl SkillStore {
 
     // ── Settings ──
 
+    pub fn proxy_url(&self) -> Option<String> {
+        self.get_setting("proxy_url").ok().flatten().filter(|s| !s.is_empty())
+    }
+
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         // Read the raw stored value while holding the lock, then release it
         // before any write-back so we don't re-enter the mutex.

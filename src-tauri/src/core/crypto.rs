@@ -8,23 +8,42 @@ use std::path::Path;
 pub const ENC_PREFIX: &str = "enc:v1:";
 
 /// Load an existing 32-byte key from `path`, or generate and persist a new one.
+///
+/// If the file exists but has an unexpected size, returns an error instead of
+/// silently regenerating — regenerating would make all previously encrypted
+/// values permanently undecryptable.
 pub fn load_or_create_key(path: &Path) -> Result<[u8; 32]> {
     if path.exists() {
         let bytes = std::fs::read(path).context("Failed to read secret key file")?;
-        if bytes.len() == 32 {
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&bytes);
-            return Ok(key);
-        }
-        // File exists but is corrupted — regenerate silently.
+        anyhow::ensure!(
+            bytes.len() == 32,
+            "Secret key file '{}' is corrupted ({} bytes, expected 32). \
+             Delete it manually to regenerate, but note that existing encrypted values will be lost.",
+            path.display(),
+            bytes.len()
+        );
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&bytes);
+        return Ok(key);
     }
 
     let mut key = [0u8; 32];
     use rand::RngCore;
     rand::thread_rng().fill_bytes(&mut key);
     std::fs::write(path, &key).context("Failed to write secret key file")?;
+    set_owner_readonly(path);
     Ok(key)
 }
+
+/// On Unix, restrict the key file to owner-only access (0600).
+#[cfg(unix)]
+fn set_owner_readonly(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+}
+
+#[cfg(not(unix))]
+fn set_owner_readonly(_path: &Path) {}
 
 /// Encrypt `plaintext` with AES-256-GCM and return an `enc:v1:<hex>` string.
 pub fn encrypt(key: &[u8; 32], plaintext: &str) -> Result<String> {
@@ -126,5 +145,26 @@ mod tests {
 
         let key2 = load_or_create_key(&path).unwrap();
         assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn corrupted_key_file_returns_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".secret.key");
+        // Write a file with wrong length.
+        std::fs::write(&path, b"too-short").unwrap();
+        let err = load_or_create_key(&path).unwrap_err();
+        assert!(err.to_string().contains("corrupted"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn key_file_has_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".secret.key");
+        load_or_create_key(&path).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 }

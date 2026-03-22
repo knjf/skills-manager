@@ -7,6 +7,7 @@ export interface ToolInfo {
   display_name: string;
   installed: boolean;
   skills_dir: string;
+  enabled: boolean;
 }
 
 export interface ManagedSkill {
@@ -111,6 +112,12 @@ export interface ProjectSkillDocument {
 
 export const getToolStatus = () => invoke<ToolInfo[]>("get_tool_status");
 
+export const setToolEnabled = (key: string, enabled: boolean) =>
+  invoke<void>("set_tool_enabled", { key, enabled });
+
+export const setAllToolsEnabled = (enabled: boolean) =>
+  invoke<void>("set_all_tools_enabled", { enabled });
+
 // ── Skills ──
 
 export const getManagedSkills = () =>
@@ -209,6 +216,10 @@ export const setSettings = (key: string, value: string) =>
 
 export const getCentralRepoPath = () =>
   invoke<string>("get_central_repo_path");
+
+export const appExit = () => invoke<void>("app_exit");
+
+export const hideToTray = () => invoke<void>("hide_to_tray");
 
 export const openCentralRepoFolder = () =>
   invoke<void>("open_central_repo_folder");

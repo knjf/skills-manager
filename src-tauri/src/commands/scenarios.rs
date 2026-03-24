@@ -214,6 +214,8 @@ pub async fn delete_scenario(
             if let Some(first) = remaining.first() {
                 store.set_active_scenario(&first.id).map_err(AppError::db)?;
                 sync_scenario_skills(&store, &first.id)?;
+            } else {
+                store.clear_active_scenario().map_err(AppError::db)?;
             }
         }
 
@@ -285,19 +287,26 @@ pub async fn add_skill_to_scenario(
                             &adapter.key,
                             configured_mode.as_deref(),
                         );
-                        if sync_engine::sync_skill(&source, &target, mode).is_ok() {
-                            let now = chrono::Utc::now().timestamp_millis();
-                            let target_record = crate::core::skill_store::SkillTargetRecord {
-                                id: uuid::Uuid::new_v4().to_string(),
-                                skill_id: skill_id.clone(),
-                                tool: adapter.key.clone(),
-                                target_path: target.to_string_lossy().to_string(),
-                                mode: mode.as_str().to_string(),
-                                status: "ok".to_string(),
-                                synced_at: Some(now),
-                                last_error: None,
-                            };
-                            store.insert_target(&target_record).ok();
+                        match sync_engine::sync_skill(&source, &target, mode) {
+                            Ok(_actual_mode) => {
+                                let now = chrono::Utc::now().timestamp_millis();
+                                let target_record = crate::core::skill_store::SkillTargetRecord {
+                                    id: uuid::Uuid::new_v4().to_string(),
+                                    skill_id: skill_id.clone(),
+                                    tool: adapter.key.clone(),
+                                    target_path: target.to_string_lossy().to_string(),
+                                    mode: mode.as_str().to_string(),
+                                    status: "ok".to_string(),
+                                    synced_at: Some(now),
+                                    last_error: None,
+                                };
+                                if let Err(e) = store.insert_target(&target_record) {
+                                    log::warn!("Failed to insert sync target for skill {skill_id}: {e}");
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to sync skill {skill_id} to {}: {e}", target.display());
+                            }
                         }
                     }
                 }
@@ -329,18 +338,14 @@ pub async fn remove_skill_from_scenario(
         // If this is the active scenario, unsync the skill
         if let Ok(Some(active_id)) = store.get_active_scenario_id() {
             if active_id == scenario_id {
-                // Check if skill is in any other active scenario
-                let other_scenarios = store.get_scenarios_for_skill(&skill_id).unwrap_or_default();
-                if !other_scenarios.contains(&active_id) {
-                    // Unsync from all tools
-                    let targets = store.get_targets_for_skill(&skill_id).unwrap_or_default();
-                    for target in &targets {
-                        let path = PathBuf::from(&target.target_path);
-                        sync_engine::remove_target(&path).ok();
+                let targets = store.get_targets_for_skill(&skill_id).unwrap_or_default();
+                for target in &targets {
+                    let path = PathBuf::from(&target.target_path);
+                    if let Err(e) = sync_engine::remove_target(&path) {
+                        log::warn!("Failed to remove sync target {}: {e}", path.display());
                     }
-                    // Remove all targets for this skill
-                    for target in &targets {
-                        store.delete_target(&skill_id, &target.tool).ok();
+                    if let Err(e) = store.delete_target(&skill_id, &target.tool) {
+                        log::warn!("Failed to delete target record for skill {skill_id}, tool {}: {e}", target.tool);
                     }
                 }
             }
@@ -416,19 +421,26 @@ pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Res
         for adapter in &adapters {
             let target = adapter.skills_dir().join(&skill.name);
             let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode.as_deref());
-            if let Ok(actual_mode) = sync_engine::sync_skill(&source, &target, mode) {
-                let now = chrono::Utc::now().timestamp_millis();
-                let target_record = crate::core::skill_store::SkillTargetRecord {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    skill_id: skill.id.clone(),
-                    tool: adapter.key.clone(),
-                    target_path: target.to_string_lossy().to_string(),
-                    mode: actual_mode.as_str().to_string(),
-                    status: "ok".to_string(),
-                    synced_at: Some(now),
-                    last_error: None,
-                };
-                store.insert_target(&target_record).ok();
+            match sync_engine::sync_skill(&source, &target, mode) {
+                Ok(actual_mode) => {
+                    let now = chrono::Utc::now().timestamp_millis();
+                    let target_record = crate::core::skill_store::SkillTargetRecord {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        skill_id: skill.id.clone(),
+                        tool: adapter.key.clone(),
+                        target_path: target.to_string_lossy().to_string(),
+                        mode: actual_mode.as_str().to_string(),
+                        status: "ok".to_string(),
+                        synced_at: Some(now),
+                        last_error: None,
+                    };
+                    if let Err(e) = store.insert_target(&target_record) {
+                        log::warn!("Failed to insert sync target for skill {}: {e}", skill.id);
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to sync skill {} to {}: {e}", skill.id, target.display());
+                }
             }
         }
     }
@@ -448,8 +460,12 @@ pub(crate) fn unsync_scenario_skills(
         let targets = store.get_targets_for_skill(skill_id).unwrap_or_default();
         for target in &targets {
             let path = PathBuf::from(&target.target_path);
-            sync_engine::remove_target(&path).ok();
-            store.delete_target(skill_id, &target.tool).ok();
+            if let Err(e) = sync_engine::remove_target(&path) {
+                log::warn!("Failed to remove sync target {}: {e}", path.display());
+            }
+            if let Err(e) = store.delete_target(skill_id, &target.tool) {
+                log::warn!("Failed to delete target record for skill {skill_id}, tool {}: {e}", target.tool);
+            }
         }
     }
 

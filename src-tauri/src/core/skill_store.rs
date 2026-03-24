@@ -808,6 +808,15 @@ impl SkillStore {
         Ok(rows.next().and_then(|r| r.ok()).flatten())
     }
 
+    pub fn clear_active_scenario(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM active_scenario WHERE key = 'current'",
+            [],
+        )?;
+        Ok(())
+    }
+
     pub fn set_active_scenario(&self, scenario_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

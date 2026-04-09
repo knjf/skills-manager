@@ -811,6 +811,7 @@ function ExportFromCenterDialog({
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState<string | null>(null);
   const [batchExporting, setBatchExporting] = useState(false);
   const [dirNameMap, setDirNameMap] = useState<Record<string, string>>({});
@@ -848,12 +849,24 @@ function ExportFromCenterDialog({
     };
   }, [managedSkills]);
 
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const skill of managedSkills) {
+      for (const tag of skill.tags) {
+        if (tag.trim()) tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }, [managedSkills]);
+
   const filtered = useMemo(() => managedSkills.filter((skill) => {
     const matchesSearch =
       skill.name.toLowerCase().includes(search.toLowerCase()) ||
       (skill.description || "").toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  }), [managedSkills, search]);
+    if (!matchesSearch) return false;
+    if (tagFilters.size === 0) return true;
+    return skill.tags.some((tag) => tagFilters.has(tag));
+  }), [managedSkills, search, tagFilters]);
 
   const isAlreadyExists = useCallback((skill: ManagedSkill) => {
     const exportDirName = dirNameMap[skill.id];
@@ -869,6 +882,8 @@ function ExportFromCenterDialog({
     isMultiSelect, setIsMultiSelect,
     selectedIds,
     toggleSelect,
+    isAllSelected,
+    handleSelectAll,
     exitMultiSelect,
   } = useMultiSelect({
     items: managedSkills,
@@ -955,6 +970,54 @@ function ExportFromCenterDialog({
               <SquareCheck className="h-4 w-4" />
             </button>
           </div>
+          {allTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[12px] text-muted">{t("mySkills.tags.filter")}</span>
+              <button
+                onClick={() => setTagFilters(new Set())}
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[12px] transition-colors",
+                  tagFilters.size === 0
+                    ? "border-accent-border bg-accent-bg text-accent-light"
+                    : "border-border-subtle text-muted hover:border-border hover:text-secondary"
+                )}
+              >
+                {t("mySkills.tags.allTags")}
+              </button>
+              {allTags.map((tag) => {
+                const active = tagFilters.has(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      setTagFilters((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(tag)) next.delete(tag);
+                        else next.add(tag);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[12px] transition-colors",
+                      active
+                        ? "border-accent-border bg-accent-bg text-accent-light"
+                        : "border-border-subtle text-muted hover:border-border hover:text-secondary"
+                    )}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+              {isMultiSelect && selectableFiltered.length > 0 && (
+                <button
+                  onClick={handleSelectAll}
+                  className="ml-auto text-[12px] text-accent hover:underline"
+                >
+                  {isAllSelected ? t("project.deselectAll") : t("project.selectAll")}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="max-h-[400px] overflow-y-auto scrollbar-hide">

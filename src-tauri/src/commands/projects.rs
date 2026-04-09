@@ -193,12 +193,16 @@ pub async fn add_project(
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let project_path = Path::new(&path);
-        let skills_dir = project_path.join(".claude").join("skills");
-        if !skills_dir.is_dir() {
-            return Err(AppError::invalid_input(
-                "Directory does not contain .claude/skills/",
-            ));
+        if !project_path.is_dir() {
+            return Err(AppError::invalid_input("Directory does not exist"));
         }
+        let claude_dir = project_path.join(".claude");
+        let skills_dir = claude_dir.join("skills");
+        let disabled_dir = claude_dir.join("skills-disabled");
+
+        // Support initializing an empty project directory as a managed project.
+        std::fs::create_dir_all(&skills_dir)?;
+        std::fs::create_dir_all(&disabled_dir)?;
 
         let name = project_path
             .file_name()

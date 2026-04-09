@@ -8,8 +8,8 @@
     "installSkills": "安装 Skills",
     "scenarios": "场景",
     "newScenario": "新建场景",
-    "projects": "项目",
-    "addProject": "添加项目",
+    "projects": "项目工作区",
+    "addProject": "关联项目",
     "settings": "设置"
   },
   "help": {
@@ -460,10 +460,11 @@
   "project": {
     "title": "项目 Skills",
     "path": "项目路径",
+    "workspaceHint": "管理该仓库中的 .claude/skills 本地副本，并与 Skills 中心双向同步。",
     "skills": "Skills",
     "noSkills": "该项目下没有 Skills",
     "noSkillsHint": "在项目目录下创建 .claude/skills/ 子目录并添加 Skill 文件夹。",
-    "addManual": "选择项目目录",
+    "addManual": "选择仓库目录",
     "scanDir": "扫描目录",
     "scanDirPlaceholder": "输入要扫描的根目录路径，如 ~/Work",
     "scanResult": "发现 {{count}} 个项目",
@@ -475,7 +476,7 @@
     "notFound": "项目不存在",
     "alreadyExists": "已存在",
     "invalidDir": "目录中没有 .claude/skills/",
-    "addProjectTitle": "添加项目",
+    "addProjectTitle": "关联项目工作区",
     "tabManual": "手动添加",
     "tabScan": "扫描发现",
     "addSelected": "添加选中 ({{count}})",

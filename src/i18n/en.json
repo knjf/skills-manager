@@ -8,8 +8,8 @@
     "installSkills": "Install Skills",
     "scenarios": "Scenarios",
     "newScenario": "New Scenario",
-    "projects": "Projects",
-    "addProject": "Add Project",
+    "projects": "Project Workspaces",
+    "addProject": "Link Project",
     "settings": "Settings"
   },
   "help": {
@@ -460,10 +460,11 @@
   "project": {
     "title": "Project Skills",
     "path": "Project Path",
+    "workspaceHint": "Manage the local .claude/skills copies in this repository and sync them with the Skills Center.",
     "skills": "Skills",
     "noSkills": "No skills in this project",
     "noSkillsHint": "Create a .claude/skills/ directory in the project and add skill folders.",
-    "addManual": "Select Project Directory",
+    "addManual": "Select Repository Directory",
     "scanDir": "Scan Directory",
     "scanDirPlaceholder": "Enter root directory to scan, e.g. ~/Work",
     "scanResult": "Found {{count}} projects",
@@ -475,7 +476,7 @@
     "notFound": "Project not found",
     "alreadyExists": "Already exists",
     "invalidDir": "Directory does not contain .claude/skills/",
-    "addProjectTitle": "Add Project",
+    "addProjectTitle": "Link Project Workspace",
     "tabManual": "Manual",
     "tabScan": "Scan",
     "addSelected": "Add Selected ({{count}})",

@@ -8,8 +8,8 @@
     "installSkills": "安裝 Skills",
     "scenarios": "場景",
     "newScenario": "新增場景",
-    "projects": "專案",
-    "addProject": "新增專案",
+    "projects": "專案工作區",
+    "addProject": "關聯專案",
     "settings": "設定"
   },
   "help": {
@@ -385,10 +385,11 @@
   "project": {
     "title": "專案 Skills",
     "path": "專案路徑",
+    "workspaceHint": "管理此倉庫中的 .claude/skills 本機副本，並與 Skills 中心雙向同步。",
     "skills": "Skills",
     "noSkills": "該專案下沒有 Skills",
     "noSkillsHint": "在專案目錄下建立 .claude/skills/ 子目錄並新增 Skill 資料夾。",
-    "addManual": "選擇專案目錄",
+    "addManual": "選擇倉庫目錄",
     "scanDir": "掃描目錄",
     "scanDirPlaceholder": "輸入要掃描的根目錄路徑，如 ~/Work",
     "scanResult": "發現 {{count}} 個專案",
@@ -400,7 +401,7 @@
     "notFound": "專案不存在",
     "alreadyExists": "已存在",
     "invalidDir": "目錄中沒有 .claude/skills/",
-    "addProjectTitle": "新增專案",
+    "addProjectTitle": "關聯專案工作區",
     "tabManual": "手動新增",
     "tabScan": "掃描發現",
     "addSelected": "新增選取（{{count}}）",

@@ -317,6 +317,9 @@ export function ProjectDetail() {
           {project.path}
           {skills.length > 0 && ` \u00B7 ${enabledCount} / ${skills.length} ${t("project.enabled")}`}
         </p>
+        <p className="mt-1 text-[13px] text-muted">
+          {t("project.workspaceHint")}
+        </p>
       </div>
 
       <div className="app-toolbar">

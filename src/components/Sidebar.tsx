@@ -219,7 +219,7 @@ export function Sidebar() {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             className={cn(
-                              "group flex items-center gap-0.5 rounded-[5px] transition-colors",
+                              "group relative flex items-center rounded-[5px] transition-colors",
                               isActive ? "bg-surface-active" : "hover:bg-surface-hover"
                             )}
                           >
@@ -244,10 +244,10 @@ export function Sidebar() {
                               {scenario.skill_count > 0 && (
                                 <span
                                   className={cn(
-                                    "rounded-full px-1.5 text-[13px] font-medium leading-[18px]",
+                                    "shrink-0 rounded-full px-1.5 text-[13px] font-medium leading-[18px] group-hover:hidden",
                                     isActive
                                       ? "bg-accent-bg text-accent-light"
-                                      : "bg-surface-hover text-muted group-hover:bg-surface-active"
+                                      : "bg-surface-hover text-muted"
                                   )}
                                 >
                                   {scenario.skill_count}
@@ -255,7 +255,10 @@ export function Sidebar() {
                               )}
                             </button>
 
-                            <div className="mr-1.5 flex items-center opacity-0 transition group-hover:opacity-100">
+                            <div className={cn(
+                              "absolute right-1 flex items-center rounded-[3px] invisible opacity-0 transition-opacity group-hover:visible group-hover:opacity-100",
+                              isActive ? "bg-surface-active" : "bg-surface-hover"
+                            )}>
                               <div
                                 {...provided.dragHandleProps}
                                 className="rounded p-1 text-faint cursor-grab active:cursor-grabbing"
@@ -264,14 +267,14 @@ export function Sidebar() {
                               </div>
                               <button
                                 onClick={(event) => handleRenameClick(event, scenario)}
-                                className="rounded p-1 text-faint transition hover:bg-surface-hover hover:text-secondary"
+                                className="rounded p-1 text-faint transition hover:text-secondary"
                                 title={t("common.rename")}
                               >
                                 <Pencil className="h-3 w-3" />
                               </button>
                               <button
                                 onClick={(event) => handleDeleteClick(event, scenario)}
-                                className="rounded p-1 text-faint transition hover:bg-surface-hover hover:text-red-400"
+                                className="rounded p-1 text-faint transition hover:text-red-400"
                                 title={t("common.delete")}
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -320,7 +323,7 @@ export function Sidebar() {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             className={cn(
-                              "group flex items-center gap-0.5 rounded-[5px] transition-colors",
+                              "group relative flex items-center rounded-[5px] transition-colors",
                               isActive ? "bg-surface-active" : "hover:bg-surface-hover"
                             )}
                           >
@@ -345,10 +348,10 @@ export function Sidebar() {
                               {project.skill_count > 0 && (
                                 <span
                                   className={cn(
-                                    "rounded-full px-1.5 text-[13px] font-medium leading-[18px]",
+                                    "shrink-0 rounded-full px-1.5 text-[13px] font-medium leading-[18px] group-hover:hidden",
                                     isActive
                                       ? "bg-accent-bg text-accent-light"
-                                      : "bg-surface-hover text-muted group-hover:bg-surface-active"
+                                      : "bg-surface-hover text-muted"
                                   )}
                                 >
                                   {project.skill_count}
@@ -356,7 +359,10 @@ export function Sidebar() {
                               )}
                             </button>
 
-                            <div className="mr-1.5 flex items-center opacity-0 transition group-hover:opacity-100">
+                            <div className={cn(
+                              "absolute right-1 flex items-center rounded-[3px] invisible opacity-0 transition-opacity group-hover:visible group-hover:opacity-100",
+                              isActive ? "bg-surface-active" : "bg-surface-hover"
+                            )}>
                               <div
                                 {...provided.dragHandleProps}
                                 className="rounded p-1 text-faint cursor-grab active:cursor-grabbing"
@@ -369,7 +375,7 @@ export function Sidebar() {
                                   e.stopPropagation();
                                   setDeleteProjectTarget(project);
                                 }}
-                                className="rounded p-1 text-faint transition hover:bg-surface-hover hover:text-red-400"
+                                className="rounded p-1 text-faint transition hover:text-red-400"
                                 title={t("common.delete")}
                               >
                                 <Trash2 className="h-3 w-3" />

@@ -98,6 +98,22 @@ pub struct ProjectRecord {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ManagedPluginRecord {
+    pub id: String,
+    pub plugin_key: String,
+    pub display_name: Option<String>,
+    pub plugin_data: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ScenarioPluginRecord {
+    pub plugin: ManagedPluginRecord,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ScenarioSkillToolToggleRecord {
     pub scenario_id: String,
     pub skill_id: String,
@@ -1031,6 +1047,150 @@ impl SkillStore {
         Ok(map)
     }
 
+    // ── Managed Plugins ──
+
+    pub fn insert_managed_plugin(&self, record: &ManagedPluginRecord) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO managed_plugins (id, plugin_key, display_name, plugin_data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                record.id,
+                record.plugin_key,
+                record.display_name,
+                record.plugin_data,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_all_managed_plugins(&self) -> Result<Vec<ManagedPluginRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, plugin_key, display_name, plugin_data, created_at, updated_at
+             FROM managed_plugins ORDER BY display_name, plugin_key",
+        )?;
+        let rows = stmt.query_map([], map_managed_plugin_row)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn get_managed_plugin_by_id(&self, id: &str) -> Result<Option<ManagedPluginRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, plugin_key, display_name, plugin_data, created_at, updated_at
+             FROM managed_plugins WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], map_managed_plugin_row)?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    pub fn get_managed_plugin_by_key(
+        &self,
+        plugin_key: &str,
+    ) -> Result<Option<ManagedPluginRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, plugin_key, display_name, plugin_data, created_at, updated_at
+             FROM managed_plugins WHERE plugin_key = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![plugin_key], map_managed_plugin_row)?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    pub fn update_managed_plugin_data(&self, id: &str, plugin_data: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE managed_plugins SET plugin_data = ?1, updated_at = ?2 WHERE id = ?3",
+            params![plugin_data, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_managed_plugin(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM managed_plugins WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // ── Scenario-Plugin mapping ──
+
+    /// Set whether a plugin is enabled for a given scenario.
+    pub fn set_scenario_plugin_enabled(
+        &self,
+        scenario_id: &str,
+        plugin_id: &str,
+        enabled: bool,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO scenario_plugins (scenario_id, plugin_id, enabled)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(scenario_id, plugin_id)
+             DO UPDATE SET enabled = excluded.enabled",
+            params![scenario_id, plugin_id, enabled],
+        )?;
+        Ok(())
+    }
+
+    /// Get all managed plugins with their enabled state for a scenario.
+    /// Plugins with no scenario_plugins row are considered enabled (default).
+    pub fn get_scenario_plugins(&self, scenario_id: &str) -> Result<Vec<ScenarioPluginRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT mp.id, mp.plugin_key, mp.display_name, mp.plugin_data, mp.created_at, mp.updated_at,
+                    COALESCE(sp.enabled, 1) AS enabled
+             FROM managed_plugins mp
+             LEFT JOIN scenario_plugins sp ON mp.id = sp.plugin_id AND sp.scenario_id = ?1
+             ORDER BY mp.display_name, mp.plugin_key",
+        )?;
+        let rows = stmt.query_map(params![scenario_id], |row| {
+            Ok(ScenarioPluginRecord {
+                plugin: ManagedPluginRecord {
+                    id: row.get(0)?,
+                    plugin_key: row.get(1)?,
+                    display_name: row.get(2)?,
+                    plugin_data: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                },
+                enabled: row.get::<_, i32>(6)? != 0,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Get the plugin keys that are enabled for a scenario.
+    /// Plugins with no scenario_plugins row are considered enabled (default).
+    pub fn get_enabled_plugin_keys_for_scenario(&self, scenario_id: &str) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT mp.plugin_key
+             FROM managed_plugins mp
+             LEFT JOIN scenario_plugins sp ON mp.id = sp.plugin_id AND sp.scenario_id = ?1
+             WHERE COALESCE(sp.enabled, 1) = 1
+             ORDER BY mp.plugin_key",
+        )?;
+        let rows = stmt.query_map(params![scenario_id], |row| row.get::<_, String>(0))?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Get the plugin keys that are disabled for a scenario.
+    pub fn get_disabled_plugin_keys_for_scenario(&self, scenario_id: &str) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT mp.plugin_key
+             FROM managed_plugins mp
+             INNER JOIN scenario_plugins sp ON mp.id = sp.plugin_id AND sp.scenario_id = ?1
+             WHERE sp.enabled = 0
+             ORDER BY mp.plugin_key",
+        )?;
+        let rows = stmt.query_map(params![scenario_id], |row| row.get::<_, String>(0))?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
     // ── Packs CRUD ──
 
     pub fn insert_pack(
@@ -1255,6 +1415,17 @@ impl SkillStore {
         })?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
+}
+
+fn map_managed_plugin_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ManagedPluginRecord> {
+    Ok(ManagedPluginRecord {
+        id: row.get(0)?,
+        plugin_key: row.get(1)?,
+        display_name: row.get(2)?,
+        plugin_data: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
 }
 
 fn map_pack_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PackRecord> {
@@ -1658,5 +1829,251 @@ mod pack_tests {
         assert!(ids.contains(&"s1".to_string()));
         assert!(ids.contains(&"s2".to_string()));
         assert!(ids.contains(&"s3".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod plugin_tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    fn test_store() -> (SkillStore, NamedTempFile) {
+        let tmp = NamedTempFile::new().unwrap();
+        let store = SkillStore::new(&tmp.path().to_path_buf()).unwrap();
+        (store, tmp)
+    }
+
+    fn insert_test_scenario(store: &SkillStore, id: &str, name: &str) {
+        let rec = ScenarioRecord {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: None,
+            icon: None,
+            sort_order: 0,
+            created_at: 1000,
+            updated_at: 1000,
+        };
+        store.insert_scenario(&rec).unwrap();
+    }
+
+    fn sample_plugin_record(id: &str, key: &str) -> ManagedPluginRecord {
+        ManagedPluginRecord {
+            id: id.to_string(),
+            plugin_key: key.to_string(),
+            display_name: Some(key.split('@').next().unwrap_or(key).to_string()),
+            plugin_data: format!(
+                r#"[{{"scope":"user","installPath":"/tmp/{key}","version":"1.0.0","installedAt":"2026-01-01T00:00:00Z","lastUpdated":"2026-01-01T00:00:00Z","gitCommitSha":"abc123"}}]"#
+            ),
+            created_at: 1000,
+            updated_at: 1000,
+        }
+    }
+
+    #[test]
+    fn insert_and_get_managed_plugin() {
+        let (store, _tmp) = test_store();
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+
+        let all = store.get_all_managed_plugins().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].plugin_key, "superpowers@claude-plugins-official");
+        assert_eq!(all[0].display_name.as_deref(), Some("superpowers"));
+    }
+
+    #[test]
+    fn get_managed_plugin_by_key() {
+        let (store, _tmp) = test_store();
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+
+        let found = store
+            .get_managed_plugin_by_key("superpowers@claude-plugins-official")
+            .unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "p1");
+
+        let not_found = store.get_managed_plugin_by_key("nonexistent").unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn get_managed_plugin_by_id() {
+        let (store, _tmp) = test_store();
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+
+        let found = store.get_managed_plugin_by_id("p1").unwrap();
+        assert!(found.is_some());
+
+        let not_found = store.get_managed_plugin_by_id("nonexistent").unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn update_managed_plugin_data() {
+        let (store, _tmp) = test_store();
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+
+        let new_data = r#"[{"scope":"user","installPath":"/tmp/new","version":"2.0.0","installedAt":"2026-01-01T00:00:00Z","lastUpdated":"2026-02-01T00:00:00Z","gitCommitSha":"def456"}]"#;
+        store.update_managed_plugin_data("p1", new_data).unwrap();
+
+        let updated = store.get_managed_plugin_by_id("p1").unwrap().unwrap();
+        assert!(updated.plugin_data.contains("2.0.0"));
+        assert!(updated.updated_at > 1000);
+    }
+
+    #[test]
+    fn delete_managed_plugin() {
+        let (store, _tmp) = test_store();
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+
+        store.delete_managed_plugin("p1").unwrap();
+        let all = store.get_all_managed_plugins().unwrap();
+        assert!(all.is_empty());
+    }
+
+    #[test]
+    fn delete_managed_plugin_cascades_to_scenario_plugins() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Test Scenario");
+        let rec = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&rec).unwrap();
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", false)
+            .unwrap();
+
+        store.delete_managed_plugin("p1").unwrap();
+
+        // scenario_plugins row should be gone via cascade
+        let scenario_plugins = store.get_scenario_plugins("sc1").unwrap();
+        assert!(scenario_plugins.is_empty());
+    }
+
+    #[test]
+    fn scenario_plugins_default_enabled() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        let p2 = sample_plugin_record("p2", "compound-engineering@compound-engineering-plugin");
+        store.insert_managed_plugin(&p1).unwrap();
+        store.insert_managed_plugin(&p2).unwrap();
+
+        // No scenario_plugins rows — all should be enabled by default
+        let plugins = store.get_scenario_plugins("sc1").unwrap();
+        assert_eq!(plugins.len(), 2);
+        assert!(plugins.iter().all(|p| p.enabled));
+    }
+
+    #[test]
+    fn set_scenario_plugin_disabled() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        let p2 = sample_plugin_record("p2", "compound-engineering@compound-engineering-plugin");
+        store.insert_managed_plugin(&p1).unwrap();
+        store.insert_managed_plugin(&p2).unwrap();
+
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", false)
+            .unwrap();
+
+        let plugins = store.get_scenario_plugins("sc1").unwrap();
+        let sp = plugins.iter().find(|p| p.plugin.id == "p1").unwrap();
+        assert!(!sp.enabled);
+        let cp = plugins.iter().find(|p| p.plugin.id == "p2").unwrap();
+        assert!(cp.enabled); // still default enabled
+    }
+
+    #[test]
+    fn get_enabled_plugin_keys() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        let p2 = sample_plugin_record("p2", "compound-engineering@compound-engineering-plugin");
+        let p3 = sample_plugin_record("p3", "github@claude-plugins-official");
+        store.insert_managed_plugin(&p1).unwrap();
+        store.insert_managed_plugin(&p2).unwrap();
+        store.insert_managed_plugin(&p3).unwrap();
+
+        // Disable p2
+        store
+            .set_scenario_plugin_enabled("sc1", "p2", false)
+            .unwrap();
+
+        let enabled = store.get_enabled_plugin_keys_for_scenario("sc1").unwrap();
+        assert_eq!(enabled.len(), 2);
+        assert!(enabled.contains(&"superpowers@claude-plugins-official".to_string()));
+        assert!(enabled.contains(&"github@claude-plugins-official".to_string()));
+        assert!(!enabled.contains(&"compound-engineering@compound-engineering-plugin".to_string()));
+    }
+
+    #[test]
+    fn get_disabled_plugin_keys() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        let p2 = sample_plugin_record("p2", "compound-engineering@compound-engineering-plugin");
+        store.insert_managed_plugin(&p1).unwrap();
+        store.insert_managed_plugin(&p2).unwrap();
+
+        store
+            .set_scenario_plugin_enabled("sc1", "p2", false)
+            .unwrap();
+
+        let disabled = store.get_disabled_plugin_keys_for_scenario("sc1").unwrap();
+        assert_eq!(disabled.len(), 1);
+        assert_eq!(
+            disabled[0],
+            "compound-engineering@compound-engineering-plugin"
+        );
+    }
+
+    #[test]
+    fn toggle_scenario_plugin_idempotent() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&p1).unwrap();
+
+        // Disable
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", false)
+            .unwrap();
+        // Disable again (should be idempotent)
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", false)
+            .unwrap();
+        let plugins = store.get_scenario_plugins("sc1").unwrap();
+        assert!(!plugins[0].enabled);
+
+        // Re-enable
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", true)
+            .unwrap();
+        let plugins = store.get_scenario_plugins("sc1").unwrap();
+        assert!(plugins[0].enabled);
+    }
+
+    #[test]
+    fn different_scenarios_independent_plugin_state() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Minimal");
+        insert_test_scenario(&store, "sc2", "Everything");
+        let p1 = sample_plugin_record("p1", "superpowers@claude-plugins-official");
+        store.insert_managed_plugin(&p1).unwrap();
+
+        // Disable in sc1, leave default (enabled) in sc2
+        store
+            .set_scenario_plugin_enabled("sc1", "p1", false)
+            .unwrap();
+
+        let sc1_plugins = store.get_scenario_plugins("sc1").unwrap();
+        assert!(!sc1_plugins[0].enabled);
+
+        let sc2_plugins = store.get_scenario_plugins("sc2").unwrap();
+        assert!(sc2_plugins[0].enabled);
     }
 }

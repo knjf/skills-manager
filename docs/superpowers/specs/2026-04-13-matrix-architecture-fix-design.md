@@ -51,12 +51,25 @@ These three concepts serve one goal and must not conflict:
 - Load ALL toggles on initial render (not just when expanded)
 - Remove the expand-to-load pattern — all data available immediately
 
+### CLI: `crates/skills-manager-cli/src/commands.rs`
+
+**`unsync_scenario` removes symlinks for ALL agents, not just claude_code:**
+
+The CLI unsync logic (line ~242) scans every agent's skills directory and removes symlinks pointing to `~/.skills-manager/skills/`. This is correct. BUT for copy-mode agents (Cursor), it removes directories matching skill names from the *current scenario's effective list* — which is the NEW scenario after `set_active_scenario` has already been called. This means copy-mode agents lose skills that exist in both old and new scenarios.
+
+**Fix:** In `cmd_switch`, call `unsync_scenario` BEFORE `set_active_scenario`. Currently the order is:
+1. `unsync_scenario(old_id)` — correct, called before set_active
+2. `store.set_active_scenario(target.id)` — sets new active
+3. `sync_scenario(target.id)` — syncs new
+
+Wait — looking at the code again (line 89-93), unsync IS called before set_active. The actual bug may be in `sync_scenario` — some skills fail to sync silently (the `source.exists()` check on line 309 skips skills whose central_path doesn't exist, and the error is only a warning).
+
+**Actual fix needed:** `sync_scenario` should report skipped skills more visibly, and ensure ALL effective skills are synced. The "source path is neither a regular file" error from the Tauri app suggests `sync_engine::sync_skill` has issues with certain directory structures.
+
 ### Not Changed
 
 - DB schema — no changes needed
 - Pack CRUD — unchanged
-- Scenario switch logic — already uses effective skills
-- CLI — unaffected
 - Plugin management — unaffected
 
 ## Verification Criteria
@@ -67,6 +80,8 @@ These three concepts serve one goal and must not conflict:
 4. "source path" error does not occur for normal toggle operations
 5. All existing tests pass
 6. New test: `set_skill_tool_toggle` accepts effective (pack) skills
+7. `sm switch` syncs ALL effective skills (no missing symlinks)
+8. `sm switch` back and forth leaves correct skill count
 
 ## Out of Scope
 

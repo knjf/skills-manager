@@ -32,6 +32,3 @@ dist-ssr
 *.sw?
 
 .claude
-docs
-reference
-CLAUDE.md

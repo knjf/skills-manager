@@ -1228,7 +1228,7 @@ impl SkillStore {
     pub fn get_effective_skill_ids_for_scenario(&self, scenario_id: &str) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT id FROM (
+            "SELECT DISTINCT candidates.id FROM (
                  SELECT ps.skill_id AS id
                  FROM pack_skills ps
                  INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
@@ -1237,8 +1237,8 @@ impl SkillStore {
                  SELECT ss.skill_id AS id
                  FROM scenario_skills ss
                  WHERE ss.scenario_id = ?2
-             )
-             INNER JOIN skills s ON s.id = id",
+             ) AS candidates
+             INNER JOIN skills s ON s.id = candidates.id",
         )?;
         let rows = stmt.query_map(params![scenario_id, scenario_id], |row| {
             row.get::<_, String>(0)
@@ -1623,5 +1623,30 @@ mod pack_tests {
         store.add_skill_to_scenario("sc1", "s1").unwrap();
 
         assert!(store.is_skill_in_effective_scenario("sc1", "s1").unwrap());
+    }
+
+    #[test]
+    fn effective_skill_ids_returns_correct_ids() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill A");
+        insert_test_skill(&store, "s2", "Skill B");
+        insert_test_skill(&store, "s3", "Skill C");
+        insert_test_scenario(&store, "sc1", "Scenario");
+
+        // s1, s2 via pack
+        store.insert_pack("p1", "Pack", None, None, None).unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_skill_to_pack("p1", "s2").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+
+        // s2, s3 direct (s2 is duplicate)
+        store.add_skill_to_scenario("sc1", "s2").unwrap();
+        store.add_skill_to_scenario("sc1", "s3").unwrap();
+
+        let ids = store.get_effective_skill_ids_for_scenario("sc1").unwrap();
+        assert_eq!(ids.len(), 3); // s1, s2, s3 — s2 deduped
+        assert!(ids.contains(&"s1".to_string()));
+        assert!(ids.contains(&"s2".to_string()));
+        assert!(ids.contains(&"s3".to_string()));
     }
 }

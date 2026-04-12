@@ -531,25 +531,19 @@ export interface PackRecord {
   updated_at: number;
 }
 
-export interface SkillRecord {
+/** Lightweight skill record returned by pack queries (not the full ManagedSkill). */
+export interface PackSkillRecord {
   id: string;
   name: string;
   description: string | null;
   source_type: string;
-  source_ref: string | null;
-  source_ref_resolved: string | null;
-  source_subpath: string | null;
-  source_branch: string | null;
-  source_revision: string | null;
-  remote_revision: string | null;
   central_path: string;
-  content_hash: string | null;
   enabled: boolean;
-  created_at: number;
-  updated_at: number;
+  status: string;
 }
 
-export const getAllPacks = () => invoke<PackRecord[]>("get_all_packs");
+export const getAllPacks = () =>
+  invoke<PackRecord[]>("get_all_packs");
 
 export const getPackById = (id: string) =>
   invoke<PackRecord | null>("get_pack_by_id", { id });
@@ -558,13 +552,13 @@ export const createPack = (
   name: string,
   description?: string,
   icon?: string,
-  color?: string
+  color?: string,
 ) =>
   invoke<PackRecord>("create_pack", {
     name,
-    description: description || null,
-    icon: icon || null,
-    color: color || null,
+    description: description ?? null,
+    icon: icon ?? null,
+    color: color ?? null,
   });
 
 export const updatePack = (
@@ -572,14 +566,14 @@ export const updatePack = (
   name: string,
   description?: string,
   icon?: string,
-  color?: string
+  color?: string,
 ) =>
   invoke<void>("update_pack", {
     id,
     name,
-    description: description || null,
-    icon: icon || null,
-    color: color || null,
+    description: description ?? null,
+    icon: icon ?? null,
+    color: color ?? null,
   });
 
 export const deletePack = (id: string) =>
@@ -592,7 +586,7 @@ export const removeSkillFromPack = (packId: string, skillId: string) =>
   invoke<void>("remove_skill_from_pack", { packId, skillId });
 
 export const getSkillsForPack = (packId: string) =>
-  invoke<SkillRecord[]>("get_skills_for_pack", { packId });
+  invoke<PackSkillRecord[]>("get_skills_for_pack", { packId });
 
 export const getPacksForScenario = (scenarioId: string) =>
   invoke<PackRecord[]>("get_packs_for_scenario", { scenarioId });
@@ -604,4 +598,38 @@ export const removePackFromScenario = (scenarioId: string, packId: string) =>
   invoke<void>("remove_pack_from_scenario", { scenarioId, packId });
 
 export const getEffectiveSkillsForScenario = (scenarioId: string) =>
-  invoke<SkillRecord[]>("get_effective_skills_for_scenario", { scenarioId });
+  invoke<PackSkillRecord[]>("get_effective_skills_for_scenario", { scenarioId });
+
+// ── Plugins (Phase 3 — stubs until backend is merged) ──
+
+export interface ManagedPlugin {
+  id: string;
+  name: string;
+  scope: string;
+  install_path: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ScenarioPlugin {
+  plugin_id: string;
+  scenario_id: string;
+  enabled: boolean;
+}
+
+export const getManagedPlugins = () =>
+  invoke<ManagedPlugin[]>("get_managed_plugins");
+
+export const scanPlugins = () =>
+  invoke<void>("scan_plugins");
+
+export const getScenarioPlugins = (scenarioId: string) =>
+  invoke<ScenarioPlugin[]>("get_scenario_plugins", { scenarioId });
+
+export const setScenarioPluginEnabled = (
+  scenarioId: string,
+  pluginId: string,
+  enabled: boolean,
+) =>
+  invoke<void>("set_scenario_plugin_enabled", { scenarioId, pluginId, enabled });

@@ -3,8 +3,10 @@
 ## Overall Status
 
 ```
-Phase 1 ✅ → Phase 2 🔄 → Phase 3 ⬜ → Phase 4 ⬜ → Phase 5 ⬜
+Phase 1 ✅ → Phase 2 📝 → Phase 3 📝 → Phase 4 📝 → Phase 5 📝
 ```
+
+✅ = merged to main | 📝 = PR open for review
 
 ---
 
@@ -36,51 +38,93 @@ Phase 1 ✅ → Phase 2 🔄 → Phase 3 ⬜ → Phase 4 ⬜ → Phase 5 ⬜
 
 ---
 
-## Phase 2: CLI Binary 🔄
+## Phase 2: CLI Binary 📝
 
-**Status:** Starting
-**Goal:** Rust CLI binary (`sm`) using `clap`, replacing `~/.local/bin/sm` shell script
-**Depends on:** Phase 1 core crate ✅
+**Completed:** 2026-04-13
+**PR:** knjf/skills-manager#3 (open for review)
+**Branch:** phase2/cli-binary
 
-### Planned commands
-```
-sm switch <scenario>     # switch active scenario
-sm list                  # list scenarios
-sm current               # show current scenario
-sm packs [scenario]      # list packs in a scenario
-sm diff <a> <b>          # diff two scenarios
-sm pack add <pack> <scenario>
-sm pack remove <pack> <scenario>
-```
+### What was done
+- Rust CLI binary `sm` using `clap` derive API at `crates/skills-manager-cli/`
+- Commands: list, current, switch, skills, diff, packs, pack add/remove
+- Uses `get_effective_skills_for_scenario()` for pack-aware operations
+- Sync logic matches shell script behavior (symlink/copy per agent)
+- Install: `cp target/release/sm ~/.local/bin/sm`
 
-### Key decisions (TBD during brainstorming)
-- Binary name: `sm` vs `skills-manager-cli`
-- Installation method: cargo install vs direct binary
-- Output format: human-readable vs JSON flag
+### Known issue
+- Cursor copy mode warns on skills with internal symlinks (pre-existing core crate issue)
 
----
-
-## Phase 3: Plugin Management ⬜
-
-**Status:** Not started
-**Goal:** Per-scenario enable/disable of Claude Code plugins
-**Depends on:** Phase 1 core crate ✅
+### Key files
+- `crates/skills-manager-cli/src/main.rs` — clap structs + entry point
+- `crates/skills-manager-cli/src/commands.rs` — command implementations
+- `docs/superpowers/specs/2026-04-13-phase2-cli-design.md`
 
 ---
 
-## Phase 4: Packs UI ⬜
+## Phase 3: Plugin Management 📝
 
-**Status:** Not started
-**Goal:** Frontend PacksView, scenario editing with pack toggles, dashboard pack cards
-**Depends on:** Phase 1 packs backend ✅
+**Completed:** 2026-04-13
+**PR:** knjf/skills-manager#4 (open for review)
+**Branch:** phase3/plugin-management
+
+### What was done
+- DB migration v5→v6: `managed_plugins` + `scenario_plugins` tables
+- New core module: `crates/skills-manager-core/src/plugins.rs` — discovery, apply, restore
+- Plugin discovery reads `~/.claude/plugins/installed_plugins.json`
+- Per-scenario enable/disable by manipulating the JSON manifest
+- 4 new Tauri IPC commands
+- Scenario switch integration: applies plugin state automatically
+- 162 tests pass (16 new plugin tests)
+
+### Key design decisions
+- Never touches plugin cache directories — only manipulates JSON
+- Plugins default to enabled (backward compatible)
+- Full plugin entry JSON saved for restore
+
+### Key files
+- `crates/skills-manager-core/src/plugins.rs` — plugin management core
+- `src-tauri/src/commands/plugins.rs` — Tauri IPC wrappers
 
 ---
 
-## Phase 5: Matrix View + Plugin UI ⬜
+## Phase 4: Packs UI 📝
 
-**Status:** Not started
-**Goal:** Agent × pack/skill toggle matrix, plugin management UI, token budget display
-**Depends on:** Phase 3 + Phase 4
+**Completed:** 2026-04-13
+**PR:** knjf/skills-manager#5 (open for review)
+**Branch:** phase4/packs-ui
+
+### What was done
+- New view: `src/views/PacksView.tsx` — pack CRUD with card grid + detail view
+- PackDialog: create/edit with icon picker (10 icons) + color picker (8 colors)
+- AddSkillsDialog: multi-select searchable skill assignment
+- Sidebar "Packs" nav item added
+- TypeScript interfaces + 11 API wrappers in `tauri.ts`
+
+### Key files
+- `src/views/PacksView.tsx` — main packs page (530 lines)
+- `src/lib/packIcons.tsx` — icon/color definitions
+
+---
+
+## Phase 5: Matrix View + Plugin UI 📝
+
+**Completed:** 2026-04-13
+**PR:** knjf/skills-manager#6 (open for review)
+**Branch:** phase5/matrix-plugin-ui
+
+### What was done
+- **MatrixView** (`src/views/MatrixView.tsx`) — agent × pack grid with expand/collapse
+  - Pack-level bulk toggles (green/amber/grey status)
+  - Skill-level individual toggles
+  - Column-level "toggle all" headers
+- **PluginsView** (`src/views/PluginsView.tsx`) — plugin list with per-scenario toggles
+  - Graceful fallback when Phase 3 backend not merged (shows placeholder)
+  - Search, scan, scope badges
+- Routes + sidebar items + i18n keys added
+
+### Dependencies
+- MatrixView: works with Phase 1 APIs (on main)
+- PluginsView: requires Phase 3 merge for full functionality
 
 ---
 

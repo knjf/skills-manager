@@ -6,6 +6,8 @@
     "dashboard": "Dashboard",
     "mySkills": "My Skills",
     "installSkills": "Install Skills",
+    "matrix": "Agent Matrix",
+    "plugins": "Plugins",
     "scenarios": "Scenarios",
     "newScenario": "New Scenario",
     "projects": "Project Workspaces",

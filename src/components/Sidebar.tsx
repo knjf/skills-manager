@@ -6,6 +6,8 @@ import {
   Layers,
   Package,
   Download,
+  Grid3X3,
+  Plug,
   Settings,
   Plus,
   Pencil,
@@ -101,6 +103,8 @@ export function Sidebar() {
     { name: t("sidebar.mySkills"), path: "/my-skills", icon: Layers },
     { name: "Packs", path: "/packs", icon: Package },
     { name: t("sidebar.installSkills"), path: "/install", icon: Download },
+    { name: t("sidebar.matrix"), path: "/matrix", icon: Grid3X3 },
+    { name: t("sidebar.plugins"), path: "/plugins", icon: Plug },
   ];
 
   const handleSwitchScenario = async (id: string) => {

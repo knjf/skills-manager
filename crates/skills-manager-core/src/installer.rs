@@ -2,9 +2,9 @@ use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use super::central_repo;
-use super::content_hash;
-use super::skill_metadata::{self, sanitize_skill_name};
+use crate::central_repo;
+use crate::content_hash;
+use crate::skill_metadata::{self, sanitize_skill_name};
 
 pub struct InstallResult {
     pub name: String,

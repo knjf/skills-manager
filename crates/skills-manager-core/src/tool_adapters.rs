@@ -502,7 +502,7 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
 }
 
 /// Read custom tool path overrides from store.
-pub fn custom_tool_paths(store: &crate::core::skill_store::SkillStore) -> HashMap<String, String> {
+pub fn custom_tool_paths(store: &crate::skill_store::SkillStore) -> HashMap<String, String> {
     store
         .get_setting("custom_tool_paths")
         .ok()
@@ -512,7 +512,7 @@ pub fn custom_tool_paths(store: &crate::core::skill_store::SkillStore) -> HashMa
 }
 
 /// Read user-defined custom tools from store.
-pub fn custom_tools(store: &crate::core::skill_store::SkillStore) -> Vec<CustomToolDef> {
+pub fn custom_tools(store: &crate::skill_store::SkillStore) -> Vec<CustomToolDef> {
     store
         .get_setting("custom_tools")
         .ok()
@@ -522,7 +522,7 @@ pub fn custom_tools(store: &crate::core::skill_store::SkillStore) -> Vec<CustomT
 }
 
 /// Returns all tool adapters: built-in (with path overrides applied) + custom tools.
-pub fn all_tool_adapters(store: &crate::core::skill_store::SkillStore) -> Vec<ToolAdapter> {
+pub fn all_tool_adapters(store: &crate::skill_store::SkillStore) -> Vec<ToolAdapter> {
     let overrides = custom_tool_paths(store);
     let customs = custom_tools(store);
 
@@ -558,7 +558,7 @@ pub fn find_adapter(key: &str) -> Option<ToolAdapter> {
 
 /// Find an adapter by key, considering custom tools and path overrides.
 pub fn find_adapter_with_store(
-    store: &crate::core::skill_store::SkillStore,
+    store: &crate::skill_store::SkillStore,
     key: &str,
 ) -> Option<ToolAdapter> {
     if let Some(mut adapter) = default_tool_adapters().into_iter().find(|a| a.key == key) {
@@ -583,9 +583,7 @@ pub fn find_adapter_with_store(
 }
 
 /// Returns adapters that are installed and not in the disabled list.
-pub fn enabled_installed_adapters(
-    store: &crate::core::skill_store::SkillStore,
-) -> Vec<ToolAdapter> {
+pub fn enabled_installed_adapters(store: &crate::skill_store::SkillStore) -> Vec<ToolAdapter> {
     let disabled: Vec<String> = store
         .get_setting("disabled_tools")
         .ok()

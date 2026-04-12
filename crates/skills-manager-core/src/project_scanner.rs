@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-use super::{content_hash, skill_metadata};
+use crate::{content_hash, skill_metadata};
 
 /// Lightweight config describing where an agent keeps project-level skills.
 #[derive(Debug, Clone)]
@@ -112,7 +112,15 @@ fn read_skills_from_dir(
     if let Ok(canon) = std::fs::canonicalize(dir) {
         visited.insert(canon);
     }
-    read_skills_from_dir_recursive(dir, dir, enabled, agent, agent_display_name, skills, &mut visited);
+    read_skills_from_dir_recursive(
+        dir,
+        dir,
+        enabled,
+        agent,
+        agent_display_name,
+        skills,
+        &mut visited,
+    );
 }
 
 fn read_skills_from_dir_recursive(
@@ -182,7 +190,15 @@ fn read_skills_from_dir_recursive(
         if !visited.insert(canon) {
             continue;
         }
-        read_skills_from_dir_recursive(root, &path, enabled, agent, agent_display_name, skills, visited);
+        read_skills_from_dir_recursive(
+            root,
+            &path,
+            enabled,
+            agent,
+            agent_display_name,
+            skills,
+            visited,
+        );
     }
 }
 

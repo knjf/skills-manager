@@ -1,4 +1,4 @@
-use crate::core::skill_metadata;
+use crate::skill_metadata;
 use anyhow::{Context, Result};
 use git2::{Direction, Repository};
 use std::path::{Path, PathBuf};

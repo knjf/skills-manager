@@ -23,10 +23,7 @@ fn has_named_file_exact(dir: &Path, target_name: &str) -> bool {
         return false;
     };
     entries.flatten().any(|entry| {
-        entry
-            .file_type()
-            .map(|ft| ft.is_file())
-            .unwrap_or(false)
+        entry.file_type().map(|ft| ft.is_file()).unwrap_or(false)
             && entry.file_name().to_string_lossy() == target_name
     })
 }

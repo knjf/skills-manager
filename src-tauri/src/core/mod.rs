@@ -1,18 +1,6 @@
-pub mod central_repo;
-pub mod content_hash;
-pub mod crypto;
-pub mod error;
+// Re-export everything from the core crate so that
+// `use crate::core::*` continues to work in commands/.
+pub use skills_manager_core::*;
+
+// Tauri-dependent module stays local
 pub mod file_watcher;
-pub mod git_backup;
-pub mod git_fetcher;
-pub mod install_cancel;
-pub mod installer;
-pub mod migrations;
-pub mod project_scanner;
-pub mod scanner;
-pub mod skill_metadata;
-pub mod skill_store;
-pub mod skillsmp_api;
-pub mod skillssh_api;
-pub mod sync_engine;
-pub mod tool_adapters;

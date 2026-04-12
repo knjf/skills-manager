@@ -1,0 +1,15 @@
+[package]
+name = "skills-manager-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+description = "CLI for Skills Manager — manage AI agent skill scenarios from the terminal"
+
+[[bin]]
+name = "sm"
+path = "src/main.rs"
+
+[dependencies]
+skills-manager-core = { path = "../skills-manager-core" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1.0"

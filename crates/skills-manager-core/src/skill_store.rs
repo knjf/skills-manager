@@ -61,6 +61,18 @@ pub struct DiscoveredSkillRecord {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PackRecord {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub sort_order: i32,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ScenarioRecord {
     pub id: String,
     pub name: String,
@@ -1018,6 +1030,237 @@ impl SkillStore {
         }
         Ok(map)
     }
+
+    // ── Packs CRUD ──
+
+    pub fn insert_pack(
+        &self,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        icon: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let max_order: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM packs",
+            [],
+            |row| row.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO packs (id, name, description, icon, color, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![id, name, description, icon, color, max_order + 1, now, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_all_packs(&self) -> Result<Vec<PackRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, icon, color, sort_order, created_at, updated_at
+             FROM packs ORDER BY sort_order, created_at",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(PackRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                icon: row.get(3)?,
+                color: row.get(4)?,
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn get_pack_by_id(&self, id: &str) -> Result<Option<PackRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, icon, color, sort_order, created_at, updated_at
+             FROM packs WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], |row| {
+            Ok(PackRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                icon: row.get(3)?,
+                color: row.get(4)?,
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    pub fn update_pack(
+        &self,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        icon: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE packs SET name = ?1, description = ?2, icon = ?3, color = ?4, updated_at = ?5 WHERE id = ?6",
+            params![name, description, icon, color, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_pack(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM packs WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn add_skill_to_pack(&self, pack_id: &str, skill_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let max_order: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM pack_skills WHERE pack_id = ?1",
+            params![pack_id],
+            |row| row.get(0),
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO pack_skills (pack_id, skill_id, sort_order) VALUES (?1, ?2, ?3)",
+            params![pack_id, skill_id, max_order + 1],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_skill_from_pack(&self, pack_id: &str, skill_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM pack_skills WHERE pack_id = ?1 AND skill_id = ?2",
+            params![pack_id, skill_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_skills_for_pack(&self, pack_id: &str) -> Result<Vec<SkillRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
+                    s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+             FROM skills s
+             INNER JOIN pack_skills ps ON s.id = ps.skill_id
+             WHERE ps.pack_id = ?1
+             ORDER BY ps.sort_order, s.name",
+        )?;
+        let rows = stmt.query_map(params![pack_id], map_skill_row)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn add_pack_to_scenario(&self, scenario_id: &str, pack_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let max_order: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM scenario_packs WHERE scenario_id = ?1",
+            params![scenario_id],
+            |row| row.get(0),
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO scenario_packs (scenario_id, pack_id, sort_order) VALUES (?1, ?2, ?3)",
+            params![scenario_id, pack_id, max_order + 1],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_pack_from_scenario(&self, scenario_id: &str, pack_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM scenario_packs WHERE scenario_id = ?1 AND pack_id = ?2",
+            params![scenario_id, pack_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_packs_for_scenario(&self, scenario_id: &str) -> Result<Vec<PackRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT p.id, p.name, p.description, p.icon, p.color, p.sort_order, p.created_at, p.updated_at
+             FROM packs p
+             INNER JOIN scenario_packs sp ON p.id = sp.pack_id
+             WHERE sp.scenario_id = ?1
+             ORDER BY sp.sort_order, p.name",
+        )?;
+        let rows = stmt.query_map(params![scenario_id], |row| {
+            Ok(PackRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                icon: row.get(3)?,
+                color: row.get(4)?,
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    // ── Effective Skill Resolution ──
+
+    /// Returns the deduplicated, ordered effective skill list for a scenario.
+    /// Order: pack skills first (by scenario_packs.sort_order, then pack_skills.sort_order),
+    /// then direct scenario_skills appended. Duplicates removed (first occurrence wins).
+    pub fn get_effective_skills_for_scenario(&self, scenario_id: &str) -> Result<Vec<SkillRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
+                    s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+             FROM (
+                 SELECT s.id, sp.sort_order * 10000 + ps.sort_order AS effective_order
+                 FROM skills s
+                 INNER JOIN pack_skills ps ON s.id = ps.skill_id
+                 INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
+                 WHERE sp.scenario_id = ?1
+                 UNION ALL
+                 SELECT s.id, 99999000 + ss.sort_order AS effective_order
+                 FROM skills s
+                 INNER JOIN scenario_skills ss ON s.id = ss.skill_id
+                 WHERE ss.scenario_id = ?2
+             ) AS ordering
+             INNER JOIN skills s ON s.id = ordering.id
+             GROUP BY s.id
+             ORDER BY MIN(ordering.effective_order)",
+        )?;
+        let rows = stmt.query_map(params![scenario_id, scenario_id], map_skill_row)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Check if a skill is in the effective skill list for a scenario.
+    pub fn is_skill_in_effective_scenario(
+        &self,
+        scenario_id: &str,
+        skill_id: &str,
+    ) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM (
+                 SELECT ps.skill_id AS skill_id
+                 FROM pack_skills ps
+                 INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
+                 WHERE sp.scenario_id = ?1 AND ps.skill_id = ?2
+                 UNION
+                 SELECT ss.skill_id AS skill_id
+                 FROM scenario_skills ss
+                 WHERE ss.scenario_id = ?1 AND ss.skill_id = ?2
+             ) AS candidates
+             INNER JOIN skills s ON s.id = candidates.skill_id",
+            params![scenario_id, skill_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
 }
 
 fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord> {
@@ -1042,4 +1285,346 @@ fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord> {
         last_checked_at: row.get(17)?,
         last_check_error: row.get(18)?,
     })
+}
+
+#[cfg(test)]
+mod pack_tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    /// Create a SkillStore backed by a temporary database file.
+    fn test_store() -> (SkillStore, NamedTempFile) {
+        let tmp = NamedTempFile::new().unwrap();
+        let store = SkillStore::new(&tmp.path().to_path_buf()).unwrap();
+        (store, tmp)
+    }
+
+    /// Insert a minimal test skill and return its SkillRecord.
+    fn insert_test_skill(store: &SkillStore, id: &str, name: &str) -> SkillRecord {
+        let rec = SkillRecord {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: None,
+            source_type: "local".to_string(),
+            source_ref: None,
+            source_ref_resolved: None,
+            source_subpath: None,
+            source_branch: None,
+            source_revision: None,
+            remote_revision: None,
+            central_path: format!("/tmp/skills/{id}"),
+            content_hash: None,
+            enabled: true,
+            created_at: 1000,
+            updated_at: 1000,
+            status: "ok".to_string(),
+            update_status: "unknown".to_string(),
+            last_checked_at: None,
+            last_check_error: None,
+        };
+        store.insert_skill(&rec).unwrap();
+        rec
+    }
+
+    /// Insert a minimal test scenario.
+    fn insert_test_scenario(store: &SkillStore, id: &str, name: &str) {
+        let rec = ScenarioRecord {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: None,
+            icon: None,
+            sort_order: 0,
+            created_at: 1000,
+            updated_at: 1000,
+        };
+        store.insert_scenario(&rec).unwrap();
+    }
+
+    // ── Task 9: Pack CRUD Tests ──
+
+    #[test]
+    fn insert_and_get_pack() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack(
+                "p1",
+                "Core Tools",
+                Some("Essential tools"),
+                Some("🔧"),
+                Some("#ff0000"),
+            )
+            .unwrap();
+
+        let packs = store.get_all_packs().unwrap();
+        assert_eq!(packs.len(), 1);
+        assert_eq!(packs[0].id, "p1");
+        assert_eq!(packs[0].name, "Core Tools");
+        assert_eq!(packs[0].description.as_deref(), Some("Essential tools"));
+        assert_eq!(packs[0].icon.as_deref(), Some("🔧"));
+        assert_eq!(packs[0].color.as_deref(), Some("#ff0000"));
+        assert_eq!(packs[0].sort_order, 0);
+    }
+
+    #[test]
+    fn get_pack_by_id_found_and_not_found() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p1", "Pack One", None, None, None)
+            .unwrap();
+
+        let found = store.get_pack_by_id("p1").unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "Pack One");
+
+        let not_found = store.get_pack_by_id("nonexistent").unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn update_pack() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p1", "Old Name", None, None, None)
+            .unwrap();
+
+        store
+            .update_pack(
+                "p1",
+                "New Name",
+                Some("New desc"),
+                Some("🎯"),
+                Some("#00ff00"),
+            )
+            .unwrap();
+
+        let pack = store.get_pack_by_id("p1").unwrap().unwrap();
+        assert_eq!(pack.name, "New Name");
+        assert_eq!(pack.description.as_deref(), Some("New desc"));
+        assert_eq!(pack.icon.as_deref(), Some("🎯"));
+        assert_eq!(pack.color.as_deref(), Some("#00ff00"));
+    }
+
+    #[test]
+    fn delete_pack() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p1", "To Delete", None, None, None)
+            .unwrap();
+
+        store.delete_pack("p1").unwrap();
+
+        let packs = store.get_all_packs().unwrap();
+        assert!(packs.is_empty());
+    }
+
+    #[test]
+    fn add_and_remove_skill_from_pack() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill One");
+        insert_test_skill(&store, "s2", "Skill Two");
+        store
+            .insert_pack("p1", "My Pack", None, None, None)
+            .unwrap();
+
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_skill_to_pack("p1", "s2").unwrap();
+
+        let skills = store.get_skills_for_pack("p1").unwrap();
+        assert_eq!(skills.len(), 2);
+
+        store.remove_skill_from_pack("p1", "s1").unwrap();
+        let skills = store.get_skills_for_pack("p1").unwrap();
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "s2");
+    }
+
+    #[test]
+    fn add_and_remove_pack_from_scenario() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Test Scenario");
+        store.insert_pack("p1", "Pack A", None, None, None).unwrap();
+        store.insert_pack("p2", "Pack B", None, None, None).unwrap();
+
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+        store.add_pack_to_scenario("sc1", "p2").unwrap();
+
+        let packs = store.get_packs_for_scenario("sc1").unwrap();
+        assert_eq!(packs.len(), 2);
+
+        store.remove_pack_from_scenario("sc1", "p1").unwrap();
+        let packs = store.get_packs_for_scenario("sc1").unwrap();
+        assert_eq!(packs.len(), 1);
+        assert_eq!(packs[0].id, "p2");
+    }
+
+    #[test]
+    fn delete_pack_cascades_to_pack_skills() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill One");
+        store
+            .insert_pack("p1", "Cascade Pack", None, None, None)
+            .unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+
+        store.delete_pack("p1").unwrap();
+
+        // pack_skills row should be gone via cascade
+        let skills = store.get_skills_for_pack("p1").unwrap();
+        assert!(skills.is_empty());
+    }
+
+    #[test]
+    fn insert_pack_auto_sort_order() {
+        let (store, _tmp) = test_store();
+        store.insert_pack("p1", "First", None, None, None).unwrap();
+        store.insert_pack("p2", "Second", None, None, None).unwrap();
+        store.insert_pack("p3", "Third", None, None, None).unwrap();
+
+        let packs = store.get_all_packs().unwrap();
+        assert_eq!(packs[0].sort_order, 0);
+        assert_eq!(packs[1].sort_order, 1);
+        assert_eq!(packs[2].sort_order, 2);
+    }
+
+    // ── Task 10: Effective Skill Resolution Tests ──
+
+    #[test]
+    fn effective_skills_packs_only() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill A");
+        insert_test_skill(&store, "s2", "Skill B");
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        store
+            .insert_pack("p1", "Pack One", None, None, None)
+            .unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_skill_to_pack("p1", "s2").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert_eq!(effective.len(), 2);
+        assert_eq!(effective[0].id, "s1");
+        assert_eq!(effective[1].id, "s2");
+    }
+
+    #[test]
+    fn effective_skills_direct_only_backward_compat() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill A");
+        insert_test_skill(&store, "s2", "Skill B");
+        insert_test_scenario(&store, "sc1", "Scenario One");
+        store.add_skill_to_scenario("sc1", "s1").unwrap();
+        store.add_skill_to_scenario("sc1", "s2").unwrap();
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert_eq!(effective.len(), 2);
+        // Direct skills should still work without any packs
+        let ids: Vec<&str> = effective.iter().map(|s| s.id.as_str()).collect();
+        assert!(ids.contains(&"s1"));
+        assert!(ids.contains(&"s2"));
+    }
+
+    #[test]
+    fn effective_skills_packs_plus_direct_deduped() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Skill A");
+        insert_test_skill(&store, "s2", "Skill B");
+        insert_test_scenario(&store, "sc1", "Scenario One");
+
+        // s1 in a pack
+        store
+            .insert_pack("p1", "Pack One", None, None, None)
+            .unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+
+        // s1 also as a direct skill, plus s2 only direct
+        store.add_skill_to_scenario("sc1", "s1").unwrap();
+        store.add_skill_to_scenario("sc1", "s2").unwrap();
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert_eq!(effective.len(), 2, "s1 should be deduped");
+        // Pack skills come first, so s1 should be first (from pack), s2 second (direct)
+        assert_eq!(effective[0].id, "s1");
+        assert_eq!(effective[1].id, "s2");
+    }
+
+    #[test]
+    fn effective_skills_duplicate_across_packs() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Shared Skill");
+        insert_test_scenario(&store, "sc1", "Scenario One");
+
+        store.insert_pack("p1", "Pack A", None, None, None).unwrap();
+        store.insert_pack("p2", "Pack B", None, None, None).unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_skill_to_pack("p2", "s1").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+        store.add_pack_to_scenario("sc1", "p2").unwrap();
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert_eq!(
+            effective.len(),
+            1,
+            "same skill in 2 packs should appear once"
+        );
+        assert_eq!(effective[0].id, "s1");
+    }
+
+    #[test]
+    fn effective_skills_empty_scenario() {
+        let (store, _tmp) = test_store();
+        insert_test_scenario(&store, "sc1", "Empty Scenario");
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert!(effective.is_empty());
+    }
+
+    #[test]
+    fn effective_skills_handles_orphaned_skill() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Will Be Deleted");
+        insert_test_skill(&store, "s2", "Will Survive");
+        insert_test_scenario(&store, "sc1", "Scenario One");
+
+        store
+            .insert_pack("p1", "Pack One", None, None, None)
+            .unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_skill_to_pack("p1", "s2").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+
+        // Delete s1 — FK cascade removes pack_skills row, so INNER JOIN excludes it
+        store.delete_skill("s1").unwrap();
+
+        let effective = store.get_effective_skills_for_scenario("sc1").unwrap();
+        assert_eq!(effective.len(), 1);
+        assert_eq!(effective[0].id, "s2");
+    }
+
+    #[test]
+    fn is_skill_in_effective_scenario_via_pack() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "In Pack");
+        insert_test_skill(&store, "s2", "Not In Scenario");
+        insert_test_scenario(&store, "sc1", "Scenario");
+
+        store.insert_pack("p1", "Pack", None, None, None).unwrap();
+        store.add_skill_to_pack("p1", "s1").unwrap();
+        store.add_pack_to_scenario("sc1", "p1").unwrap();
+
+        assert!(store.is_skill_in_effective_scenario("sc1", "s1").unwrap());
+        assert!(!store.is_skill_in_effective_scenario("sc1", "s2").unwrap());
+    }
+
+    #[test]
+    fn is_skill_in_effective_scenario_via_direct() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s1", "Direct Skill");
+        insert_test_scenario(&store, "sc1", "Scenario");
+
+        store.add_skill_to_scenario("sc1", "s1").unwrap();
+
+        assert!(store.is_skill_in_effective_scenario("sc1", "s1").unwrap());
+    }
 }

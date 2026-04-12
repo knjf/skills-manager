@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/skills-manager-core", "src-tauri"]
+resolver = "2"

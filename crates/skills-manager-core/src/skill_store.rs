@@ -1062,18 +1062,7 @@ impl SkillStore {
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at
              FROM packs ORDER BY sort_order, created_at",
         )?;
-        let rows = stmt.query_map([], |row| {
-            Ok(PackRecord {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                icon: row.get(3)?,
-                color: row.get(4)?,
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map([], map_pack_row)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
@@ -1083,18 +1072,7 @@ impl SkillStore {
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at
              FROM packs WHERE id = ?1",
         )?;
-        let mut rows = stmt.query_map(params![id], |row| {
-            Ok(PackRecord {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                icon: row.get(3)?,
-                color: row.get(4)?,
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?;
+        let mut rows = stmt.query_map(params![id], map_pack_row)?;
         Ok(rows.next().and_then(|r| r.ok()))
     }
 
@@ -1191,18 +1169,7 @@ impl SkillStore {
              WHERE sp.scenario_id = ?1
              ORDER BY sp.sort_order, p.name",
         )?;
-        let rows = stmt.query_map(params![scenario_id], |row| {
-            Ok(PackRecord {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                icon: row.get(3)?,
-                color: row.get(4)?,
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map(params![scenario_id], map_pack_row)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
@@ -1218,15 +1185,13 @@ impl SkillStore {
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
                     s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
              FROM (
-                 SELECT s.id, sp.sort_order * 10000 + ps.sort_order AS effective_order
-                 FROM skills s
-                 INNER JOIN pack_skills ps ON s.id = ps.skill_id
+                 SELECT ps.skill_id AS id, sp.sort_order * 10000 + ps.sort_order AS effective_order
+                 FROM pack_skills ps
                  INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
                  WHERE sp.scenario_id = ?1
                  UNION ALL
-                 SELECT s.id, 99999000 + ss.sort_order AS effective_order
-                 FROM skills s
-                 INNER JOIN scenario_skills ss ON s.id = ss.skill_id
+                 SELECT ss.skill_id AS id, 99999000 + ss.sort_order AS effective_order
+                 FROM scenario_skills ss
                  WHERE ss.scenario_id = ?2
              ) AS ordering
              INNER JOIN skills s ON s.id = ordering.id
@@ -1244,23 +1209,55 @@ impl SkillStore {
         skill_id: &str,
     ) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM (
-                 SELECT ps.skill_id AS skill_id
-                 FROM pack_skills ps
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS(
+                 SELECT 1 FROM pack_skills ps
                  INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
                  WHERE sp.scenario_id = ?1 AND ps.skill_id = ?2
-                 UNION
-                 SELECT ss.skill_id AS skill_id
-                 FROM scenario_skills ss
+             ) OR EXISTS(
+                 SELECT 1 FROM scenario_skills ss
                  WHERE ss.scenario_id = ?1 AND ss.skill_id = ?2
-             ) AS candidates
-             INNER JOIN skills s ON s.id = candidates.skill_id",
+             )",
             params![scenario_id, skill_id],
             |row| row.get(0),
         )?;
-        Ok(count > 0)
+        Ok(exists)
     }
+
+    /// Returns only the IDs of the effective skill list (lighter than full records).
+    pub fn get_effective_skill_ids_for_scenario(&self, scenario_id: &str) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT id FROM (
+                 SELECT ps.skill_id AS id
+                 FROM pack_skills ps
+                 INNER JOIN scenario_packs sp ON ps.pack_id = sp.pack_id
+                 WHERE sp.scenario_id = ?1
+                 UNION ALL
+                 SELECT ss.skill_id AS id
+                 FROM scenario_skills ss
+                 WHERE ss.scenario_id = ?2
+             )
+             INNER JOIN skills s ON s.id = id",
+        )?;
+        let rows = stmt.query_map(params![scenario_id, scenario_id], |row| {
+            row.get::<_, String>(0)
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+}
+
+fn map_pack_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PackRecord> {
+    Ok(PackRecord {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        icon: row.get(3)?,
+        color: row.get(4)?,
+        sort_order: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
 }
 
 fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord> {

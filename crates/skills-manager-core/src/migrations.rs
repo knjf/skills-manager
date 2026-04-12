@@ -4,6 +4,33 @@ use rusqlite::Connection;
 /// Current schema version. Bump this when adding a new migration.
 const LATEST_VERSION: u32 = 5;
 
+const PACKS_SCHEMA_DDL: &str = "
+    CREATE TABLE IF NOT EXISTS packs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        icon TEXT,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0,
+        created_at INTEGER,
+        updated_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS pack_skills (
+        pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+        skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+        sort_order INTEGER DEFAULT 0,
+        PRIMARY KEY(pack_id, skill_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scenario_packs (
+        scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+        pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+        sort_order INTEGER DEFAULT 0,
+        PRIMARY KEY(scenario_id, pack_id)
+    );
+";
+
 /// Run all pending migrations on the database.
 ///
 /// - New databases: creates full schema and sets version to LATEST_VERSION.
@@ -172,32 +199,9 @@ fn migrate_v0_to_v1(conn: &Connection) -> Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_skill_tags_tag ON skill_tags(tag);
 
-        CREATE TABLE IF NOT EXISTS packs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT,
-            icon TEXT,
-            color TEXT,
-            sort_order INTEGER DEFAULT 0,
-            created_at INTEGER,
-            updated_at INTEGER
-        );
-
-        CREATE TABLE IF NOT EXISTS pack_skills (
-            pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
-            skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-            sort_order INTEGER DEFAULT 0,
-            PRIMARY KEY(pack_id, skill_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS scenario_packs (
-            scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
-            pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
-            sort_order INTEGER DEFAULT 0,
-            PRIMARY KEY(scenario_id, pack_id)
-        );
         ",
     )?;
+    conn.execute_batch(PACKS_SCHEMA_DDL)?;
 
     // For pre-migration databases: add columns that didn't exist in the original schema.
     // For new databases these are already in the CREATE TABLE, so the calls are no-ops.
@@ -268,32 +272,7 @@ fn migrate_v3_to_v4(conn: &Connection) -> Result<()> {
 
 /// v4 → v5: Add packs, pack_skills, and scenario_packs tables.
 fn migrate_v4_to_v5(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS packs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT,
-            icon TEXT,
-            color TEXT,
-            sort_order INTEGER DEFAULT 0,
-            created_at INTEGER,
-            updated_at INTEGER
-        );
-
-        CREATE TABLE IF NOT EXISTS pack_skills (
-            pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
-            skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-            sort_order INTEGER DEFAULT 0,
-            PRIMARY KEY(pack_id, skill_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS scenario_packs (
-            scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
-            pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
-            sort_order INTEGER DEFAULT 0,
-            PRIMARY KEY(scenario_id, pack_id)
-        );",
-    )?;
+    conn.execute_batch(PACKS_SCHEMA_DDL)?;
     Ok(())
 }
 
@@ -528,11 +507,11 @@ mod tests {
             .unwrap();
         assert_eq!(count, 0);
 
-        // Verify schema version is 5
+        // Verify schema version is at latest
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, LATEST_VERSION);
     }
 
     #[test]
@@ -585,7 +564,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, LATEST_VERSION);
     }
 
     #[test]

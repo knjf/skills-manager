@@ -470,12 +470,9 @@ pub(crate) fn unsync_scenario_skills(
     store: &SkillStore,
     scenario_id: &str,
 ) -> Result<(), AppError> {
-    let skill_ids: Vec<String> = store
-        .get_effective_skills_for_scenario(scenario_id)
-        .map_err(AppError::db)?
-        .into_iter()
-        .map(|s| s.id)
-        .collect();
+    let skill_ids = store
+        .get_effective_skill_ids_for_scenario(scenario_id)
+        .map_err(AppError::db)?;
 
     for skill_id in &skill_ids {
         let targets = store.get_targets_for_skill(skill_id).unwrap_or_default();

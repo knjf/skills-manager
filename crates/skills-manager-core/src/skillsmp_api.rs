@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::skillssh_api::{build_http_client, SkillsShSkill};
+use crate::skillssh_api::{build_http_client, SkillsShSkill};
 
 #[derive(Debug, Deserialize)]
 struct SkillsMpSkill {

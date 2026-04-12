@@ -2,10 +2,10 @@ use anyhow::Result;
 use serde::Serialize;
 use std::path::Path;
 
-use super::content_hash;
-use super::skill_metadata;
-use super::skill_store::DiscoveredSkillRecord;
-use super::tool_adapters;
+use crate::content_hash;
+use crate::skill_metadata;
+use crate::skill_store::DiscoveredSkillRecord;
+use crate::tool_adapters;
 
 pub struct ScanPlan {
     pub tools_scanned: usize,

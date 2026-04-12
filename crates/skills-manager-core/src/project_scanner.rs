@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-use super::{content_hash, skill_metadata};
+use crate::{content_hash, skill_metadata};
 
 /// Lightweight config describing where an agent keeps project-level skills.
 #[derive(Debug, Clone)]

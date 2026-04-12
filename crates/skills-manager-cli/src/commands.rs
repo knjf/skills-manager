@@ -77,60 +77,27 @@ pub fn cmd_switch(name: &str) -> Result<()> {
     let store = open_store()?;
     let target = find_scenario_by_name(&store, name)?;
 
-    // Get current scenario name for display
-    let current_name = store
-        .get_active_scenario_id()
-        .ok()
-        .flatten()
-        .and_then(|id| {
-            store
-                .get_all_scenarios()
-                .ok()
-                .and_then(|ss| ss.into_iter().find(|s| s.id == id))
-        })
+    let current_name = get_active_scenario(&store)
         .map(|s| s.name)
-        .unwrap_or_else(|| "none".to_string());
+        .unwrap_or_else(|_| "none".to_string());
 
     println!("Switching: {} -> {}", current_name, target.name);
 
     let adapters = tool_adapters::enabled_installed_adapters(&store);
     let configured_mode = store.get_setting("sync_mode").ok().flatten();
 
-    // Unsync old scenario
     if let Ok(Some(old_id)) = store.get_active_scenario_id() {
         if old_id != target.id {
             unsync_scenario(&store, &old_id, &adapters, configured_mode.as_deref())?;
         }
     }
 
-    // Set new active
     store.set_active_scenario(&target.id)?;
 
-    // Sync new scenario
-    let skills = store.get_effective_skills_for_scenario(&target.id)?;
-    for adapter in &adapters {
-        let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode.as_deref());
-        let skills_dir = adapter.skills_dir();
-        let mut synced = 0;
-
-        for skill in &skills {
-            let source = PathBuf::from(&skill.central_path);
-            if !source.exists() {
-                continue;
-            }
-            let target_path = skills_dir.join(&skill.name);
-            match sync_engine::sync_skill(&source, &target_path, mode) {
-                Ok(_) => synced += 1,
-                Err(e) => {
-                    eprintln!(
-                        "  Warning: failed to sync '{}' to {}: {}",
-                        skill.name, adapter.display_name, e
-                    );
-                }
-            }
-        }
-
-        println!("  + {} ({} skills)", adapter.display_name, synced);
+    let synced_per_adapter =
+        sync_scenario(&store, &target.id, &adapters, configured_mode.as_deref())?;
+    for (display_name, count) in synced_per_adapter {
+        println!("  + {} ({} skills)", display_name, count);
     }
 
     println!("Done. Active: {}", target.name);
@@ -201,7 +168,7 @@ pub fn cmd_packs(name: Option<&str>) -> Result<()> {
 
     println!("{} ({} packs):", scenario.name, packs.len());
     for pack in &packs {
-        let skill_count = store.get_skills_for_pack(&pack.id)?.len();
+        let skill_count = store.count_skills_for_pack(&pack.id)?;
         println!("  {:<24} {:>3} skills", pack.name, skill_count);
     }
     Ok(())
@@ -215,17 +182,7 @@ pub fn cmd_pack_add(pack_name: &str, scenario_name: &str) -> Result<()> {
     store.add_pack_to_scenario(&scenario.id, &pack.id)?;
     println!("Added pack '{}' to scenario '{}'", pack.name, scenario.name);
 
-    // If this is the active scenario, re-sync
-    if let Ok(Some(active_id)) = store.get_active_scenario_id() {
-        if active_id == scenario.id {
-            println!("Re-syncing active scenario...");
-            let adapters = tool_adapters::enabled_installed_adapters(&store);
-            let configured_mode = store.get_setting("sync_mode").ok().flatten();
-            unsync_scenario(&store, &scenario.id, &adapters, configured_mode.as_deref())?;
-            sync_scenario(&store, &scenario.id, &adapters, configured_mode.as_deref())?;
-            println!("Done.");
-        }
-    }
+    resync_if_active(&store, &scenario.id)?;
 
     Ok(())
 }
@@ -241,18 +198,23 @@ pub fn cmd_pack_remove(pack_name: &str, scenario_name: &str) -> Result<()> {
         pack.name, scenario.name
     );
 
-    // If this is the active scenario, re-sync
+    resync_if_active(&store, &scenario.id)?;
+
+    Ok(())
+}
+
+/// If `scenario_id` is the active scenario, unsync and re-sync it.
+fn resync_if_active(store: &SkillStore, scenario_id: &str) -> Result<()> {
     if let Ok(Some(active_id)) = store.get_active_scenario_id() {
-        if active_id == scenario.id {
+        if active_id == scenario_id {
             println!("Re-syncing active scenario...");
-            let adapters = tool_adapters::enabled_installed_adapters(&store);
+            let adapters = tool_adapters::enabled_installed_adapters(store);
             let configured_mode = store.get_setting("sync_mode").ok().flatten();
-            unsync_scenario(&store, &scenario.id, &adapters, configured_mode.as_deref())?;
-            sync_scenario(&store, &scenario.id, &adapters, configured_mode.as_deref())?;
+            unsync_scenario(store, scenario_id, &adapters, configured_mode.as_deref())?;
+            sync_scenario(store, scenario_id, &adapters, configured_mode.as_deref())?;
             println!("Done.");
         }
     }
-
     Ok(())
 }
 
@@ -275,8 +237,8 @@ fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_co
 // ── Sync helpers ─────────────────────────────────────────
 
 /// Remove SM-managed entries from all adapters for a given scenario.
-/// Uses filesystem scanning (like the shell script) to find entries pointing to
-/// ~/.skills-manager/skills/, which is reliable regardless of DB state.
+/// Uses filesystem scanning to find entries pointing to ~/.skills-manager/skills/,
+/// which is reliable regardless of DB state.
 fn unsync_scenario(
     store: &SkillStore,
     scenario_id: &str,
@@ -286,7 +248,6 @@ fn unsync_scenario(
     let sm_skills_dir = central_repo::skills_dir();
     let sm_skills_prefix = sm_skills_dir.to_string_lossy().to_string();
 
-    // Get the set of skill names in this scenario to identify copy-mode entries
     let skill_names: std::collections::HashSet<String> = store
         .get_effective_skills_for_scenario(scenario_id)?
         .into_iter()
@@ -309,15 +270,12 @@ fn unsync_scenario(
             let path = entry.path();
 
             if path.is_symlink() {
-                // Remove symlinks pointing to SM skills directory
                 if let Ok(target) = std::fs::read_link(&path) {
-                    let target_str = target.to_string_lossy();
-                    if target_str.contains(&sm_skills_prefix) {
+                    if target.to_string_lossy().contains(&sm_skills_prefix) {
                         let _ = sync_engine::remove_target(&path);
                     }
                 }
             } else if matches!(mode, sync_engine::SyncMode::Copy) && path.is_dir() {
-                // In copy mode, remove directories whose name matches a scenario skill
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                     if skill_names.contains(name) {
                         let _ = sync_engine::remove_target(&path);
@@ -331,17 +289,20 @@ fn unsync_scenario(
 }
 
 /// Sync all effective skills for a scenario to all enabled adapters.
+/// Returns a list of (adapter display name, synced count) pairs.
 fn sync_scenario(
     store: &SkillStore,
     scenario_id: &str,
     adapters: &[tool_adapters::ToolAdapter],
     configured_mode: Option<&str>,
-) -> Result<()> {
+) -> Result<Vec<(String, usize)>> {
     let skills = store.get_effective_skills_for_scenario(scenario_id)?;
+    let mut results = Vec::new();
 
     for adapter in adapters {
         let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode);
         let skills_dir = adapter.skills_dir();
+        let mut synced = 0;
 
         for skill in &skills {
             let source = PathBuf::from(&skill.central_path);
@@ -349,14 +310,17 @@ fn sync_scenario(
                 continue;
             }
             let target_path = skills_dir.join(&skill.name);
-            if let Err(e) = sync_engine::sync_skill(&source, &target_path, mode) {
-                eprintln!(
+            match sync_engine::sync_skill(&source, &target_path, mode) {
+                Ok(_) => synced += 1,
+                Err(e) => eprintln!(
                     "  Warning: failed to sync '{}' to {}: {}",
                     skill.name, adapter.display_name, e
-                );
+                ),
             }
         }
+
+        results.push((adapter.display_name.clone(), synced));
     }
 
-    Ok(())
+    Ok(results)
 }

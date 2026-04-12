@@ -1122,6 +1122,16 @@ impl SkillStore {
         Ok(())
     }
 
+    pub fn count_skills_for_pack(&self, pack_id: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pack_skills WHERE pack_id = ?1",
+            params![pack_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    }
+
     pub fn get_skills_for_pack(&self, pack_id: &str) -> Result<Vec<SkillRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

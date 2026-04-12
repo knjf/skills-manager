@@ -2,7 +2,25 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Current schema version. Bump this when adding a new migration.
-const LATEST_VERSION: u32 = 5;
+const LATEST_VERSION: u32 = 6;
+
+const PLUGINS_SCHEMA_DDL: &str = "
+    CREATE TABLE IF NOT EXISTS managed_plugins (
+        id TEXT PRIMARY KEY,
+        plugin_key TEXT NOT NULL UNIQUE,
+        display_name TEXT,
+        plugin_data TEXT NOT NULL,
+        created_at INTEGER,
+        updated_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS scenario_plugins (
+        scenario_id TEXT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+        plugin_id TEXT NOT NULL REFERENCES managed_plugins(id) ON DELETE CASCADE,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY(scenario_id, plugin_id)
+    );
+";
 
 const PACKS_SCHEMA_DDL: &str = "
     CREATE TABLE IF NOT EXISTS packs (
@@ -79,6 +97,7 @@ fn migrate_step(conn: &Connection, from_version: u32) -> Result<()> {
         2 => migrate_v2_to_v3(conn),
         3 => migrate_v3_to_v4(conn),
         4 => migrate_v4_to_v5(conn),
+        5 => migrate_v5_to_v6(conn),
         _ => bail!("unknown migration version: {from_version}"),
     }
 }
@@ -202,6 +221,7 @@ fn migrate_v0_to_v1(conn: &Connection) -> Result<()> {
         ",
     )?;
     conn.execute_batch(PACKS_SCHEMA_DDL)?;
+    conn.execute_batch(PLUGINS_SCHEMA_DDL)?;
 
     // For pre-migration databases: add columns that didn't exist in the original schema.
     // For new databases these are already in the CREATE TABLE, so the calls are no-ops.
@@ -273,6 +293,13 @@ fn migrate_v3_to_v4(conn: &Connection) -> Result<()> {
 /// v4 → v5: Add packs, pack_skills, and scenario_packs tables.
 fn migrate_v4_to_v5(conn: &Connection) -> Result<()> {
     conn.execute_batch(PACKS_SCHEMA_DDL)?;
+    Ok(())
+}
+
+/// v5 → v6: Add managed_plugins and scenario_plugins tables for per-scenario
+/// plugin enable/disable.
+fn migrate_v5_to_v6(conn: &Connection) -> Result<()> {
+    conn.execute_batch(PLUGINS_SCHEMA_DDL)?;
     Ok(())
 }
 
@@ -587,6 +614,135 @@ mod tests {
         let count: i32 = conn
             .query_row(
                 "SELECT COUNT(*) FROM pack_skills WHERE pack_id = 'p1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn fresh_db_creates_plugin_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+
+        // Verify managed_plugins table exists
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM managed_plugins", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+
+        // Verify scenario_plugins table exists
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM scenario_plugins", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn v5_to_v6_migration_adds_plugin_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "user_version", 5).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS skills (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS scenarios (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE);",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO scenarios (id, name) VALUES ('sc1', 'test-scenario')",
+            [],
+        )
+        .unwrap();
+
+        run_migrations(&conn).unwrap();
+
+        // Insert a managed plugin
+        conn.execute(
+            "INSERT INTO managed_plugins (id, plugin_key, display_name, plugin_data, created_at, updated_at) VALUES ('mp1', 'test@plugin', 'test', '[]', 0, 0)",
+            [],
+        )
+        .unwrap();
+
+        // Insert a scenario_plugins row
+        conn.execute(
+            "INSERT INTO scenario_plugins (scenario_id, plugin_id, enabled) VALUES ('sc1', 'mp1', 0)",
+            [],
+        )
+        .unwrap();
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, LATEST_VERSION);
+    }
+
+    #[test]
+    fn plugin_cascade_delete_scenario() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        run_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO scenarios (id, name) VALUES ('sc1', 'test')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO managed_plugins (id, plugin_key, display_name, plugin_data, created_at, updated_at) VALUES ('mp1', 'test@plugin', 'test', '[]', 0, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO scenario_plugins (scenario_id, plugin_id, enabled) VALUES ('sc1', 'mp1', 0)",
+            [],
+        )
+        .unwrap();
+
+        // Delete scenario — should cascade to scenario_plugins
+        conn.execute("DELETE FROM scenarios WHERE id = 'sc1'", [])
+            .unwrap();
+
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM scenario_plugins WHERE scenario_id = 'sc1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn plugin_cascade_delete_managed_plugin() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        run_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO scenarios (id, name) VALUES ('sc1', 'test')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO managed_plugins (id, plugin_key, display_name, plugin_data, created_at, updated_at) VALUES ('mp1', 'test@plugin', 'test', '[]', 0, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO scenario_plugins (scenario_id, plugin_id, enabled) VALUES ('sc1', 'mp1', 0)",
+            [],
+        )
+        .unwrap();
+
+        // Delete managed_plugin — should cascade to scenario_plugins
+        conn.execute("DELETE FROM managed_plugins WHERE id = 'mp1'", [])
+            .unwrap();
+
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM scenario_plugins WHERE plugin_id = 'mp1'",
                 [],
                 |row| row.get(0),
             )

@@ -7,6 +7,7 @@ pub mod git_fetcher;
 pub mod install_cancel;
 pub mod installer;
 pub mod migrations;
+pub mod plugins;
 pub mod project_scanner;
 pub mod scanner;
 pub mod skill_metadata;
@@ -19,7 +20,7 @@ pub mod tool_adapters;
 // Re-export commonly used types
 pub use error::{AppError, ErrorKind};
 pub use skill_store::{
-    DiscoveredSkillRecord, PackRecord, ProjectRecord, ScenarioRecord,
-    ScenarioSkillToolToggleRecord, SkillRecord, SkillStore, SkillTargetRecord,
+    DiscoveredSkillRecord, ManagedPluginRecord, PackRecord, ProjectRecord, ScenarioPluginRecord,
+    ScenarioRecord, ScenarioSkillToolToggleRecord, SkillRecord, SkillStore, SkillTargetRecord,
 };
 pub use sync_engine::SyncMode;

@@ -508,6 +508,83 @@ impl SkillStore {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
+    pub fn mark_discovered_as_native(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE discovered_skills SET is_native = 1 WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_native_skills_for_tool(&self, tool: &str) -> Result<Vec<DiscoveredSkillRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id, is_native
+             FROM discovered_skills WHERE tool = ?1 AND is_native = 1
+             ORDER BY name_guess",
+        )?;
+        let rows = stmt.query_map(params![tool], |row| {
+            Ok(DiscoveredSkillRecord {
+                id: row.get(0)?,
+                tool: row.get(1)?,
+                found_path: row.get(2)?,
+                name_guess: row.get(3)?,
+                fingerprint: row.get(4)?,
+                found_at: row.get(5)?,
+                imported_skill_id: row.get(6)?,
+                is_native: row.get::<_, i32>(7)? != 0,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn get_skill_by_name(&self, name: &str) -> Result<Option<SkillRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
+                    source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+             FROM skills WHERE name = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![name], map_skill_row)?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    pub fn find_discovered_by_tool_and_path(
+        &self,
+        tool: &str,
+        found_path: &str,
+    ) -> Result<Option<DiscoveredSkillRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id, is_native
+             FROM discovered_skills WHERE tool = ?1 AND found_path = ?2",
+        )?;
+        let mut rows = stmt.query_map(params![tool, found_path], |row| {
+            Ok(DiscoveredSkillRecord {
+                id: row.get(0)?,
+                tool: row.get(1)?,
+                found_path: row.get(2)?,
+                name_guess: row.get(3)?,
+                fingerprint: row.get(4)?,
+                found_at: row.get(5)?,
+                imported_skill_id: row.get(6)?,
+                is_native: row.get::<_, i32>(7)? != 0,
+            })
+        })?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    pub fn link_discovered_to_skill(&self, discovered_id: &str, skill_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE discovered_skills SET imported_skill_id = ?1 WHERE id = ?2",
+            params![skill_id, discovered_id],
+        )?;
+        Ok(())
+    }
+
     // ── Cache ──
 
     pub fn get_cache(&self, key: &str, ttl_secs: i64) -> Result<Option<String>> {

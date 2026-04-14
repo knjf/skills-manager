@@ -58,6 +58,7 @@ pub struct DiscoveredSkillRecord {
     pub fingerprint: Option<String>,
     pub found_at: i64,
     pub imported_skill_id: Option<String>,
+    pub is_native: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -471,8 +472,8 @@ impl SkillStore {
     pub fn insert_discovered(&self, rec: &DiscoveredSkillRecord) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO discovered_skills (id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO discovered_skills (id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id, is_native)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 rec.id,
                 rec.tool,
@@ -481,6 +482,7 @@ impl SkillStore {
                 rec.fingerprint,
                 rec.found_at,
                 rec.imported_skill_id,
+                rec.is_native as i32,
             ],
         )?;
         Ok(())
@@ -489,7 +491,7 @@ impl SkillStore {
     pub fn get_all_discovered(&self) -> Result<Vec<DiscoveredSkillRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id FROM discovered_skills",
+            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id, is_native FROM discovered_skills",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(DiscoveredSkillRecord {
@@ -500,6 +502,7 @@ impl SkillStore {
                 fingerprint: row.get(4)?,
                 found_at: row.get(5)?,
                 imported_skill_id: row.get(6)?,
+                is_native: row.get::<_, i32>(7)? != 0,
             })
         })?;
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -1596,7 +1599,7 @@ impl SkillStore {
     pub fn get_discovered_for_tool(&self, tool: &str) -> Result<Vec<DiscoveredSkillRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id
+            "SELECT id, tool, found_path, name_guess, fingerprint, found_at, imported_skill_id, is_native
              FROM discovered_skills WHERE tool = ?1 AND imported_skill_id IS NULL
              ORDER BY name_guess",
         )?;
@@ -1609,6 +1612,7 @@ impl SkillStore {
                 fingerprint: row.get(4)?,
                 found_at: row.get(5)?,
                 imported_skill_id: row.get(6)?,
+                is_native: row.get::<_, i32>(7)? != 0,
             })
         })?;
         Ok(rows.filter_map(|r| r.ok()).collect())

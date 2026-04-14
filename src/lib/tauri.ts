@@ -658,17 +658,15 @@ export const getAgentSkillOwnership = (toolKey: string) =>
 
 export interface ManagedPlugin {
   id: string;
-  name: string;
-  scope: string;
-  install_path: string;
-  description: string | null;
+  plugin_key: string;
+  display_name: string | null;
+  plugin_data: string;
   created_at: number;
   updated_at: number;
 }
 
 export interface ScenarioPlugin {
-  plugin_id: string;
-  scenario_id: string;
+  plugin: ManagedPlugin;
   enabled: boolean;
 }
 

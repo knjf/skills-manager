@@ -108,15 +108,13 @@ export function PluginsView() {
   // ── Derived state ──
 
   const isPluginEnabled = (pluginId: string): boolean => {
-    const sp = scenarioPlugins.find((p) => p.plugin_id === pluginId);
+    const sp = scenarioPlugins.find((p) => p.plugin.id === pluginId);
     return sp?.enabled ?? false;
   };
 
   const filtered = plugins.filter((plugin) => {
-    const matchesSearch =
-      plugin.name.toLowerCase().includes(search.toLowerCase()) ||
-      (plugin.description || "").toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
+    const name = (plugin.display_name || plugin.plugin_key).toLowerCase();
+    return name.includes(search.toLowerCase());
   });
 
   // ── Render ──
@@ -270,29 +268,22 @@ export function PluginsView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="truncate text-[14px] font-semibold text-primary">
-                      {plugin.name}
+                      {plugin.display_name || plugin.plugin_key}
                     </h3>
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                        plugin.scope === "global"
-                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                          : "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+                        "bg-violet-500/10 text-violet-600 dark:text-violet-400",
                       )}
                     >
-                      {plugin.scope}
+                      {plugin.plugin_key.includes("@") ? plugin.plugin_key.split("@")[1] : "local"}
                     </span>
                   </div>
-                  {plugin.description && (
-                    <p className="mt-0.5 truncate text-[13px] text-muted">
-                      {plugin.description}
-                    </p>
-                  )}
                   <p
                     className="mt-0.5 truncate text-[12px] text-faint"
-                    title={plugin.install_path}
+                    title={plugin.plugin_key}
                   >
-                    {plugin.install_path}
+                    {plugin.plugin_key}
                   </p>
                 </div>
 

@@ -36,24 +36,34 @@ export function HistoryView() {
   }, [selectedSkillId]);
 
   useEffect(() => {
-    const next: [string | null, string | null] =
-      versions.length >= 2
-        ? [versions[1].id, versions[0].id]
-        : versions.length === 1
-          ? [null, versions[0].id]
-          : [null, null];
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedVersions(next);
+    // versions is sorted newest-first; slot 0 = older, slot 1 = newer
+    if (versions.length >= 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedVersions([versions[1].id, versions[0].id]);
+    } else if (versions.length === 1) {
+      setSelectedVersions([null, versions[0].id]);
+    } else {
+      setSelectedVersions([null, null]);
+    }
   }, [versions]);
 
   const toggleVersion = (id: string) => {
     setSelectedVersions((prev) => {
-      if (prev[0] === id) return [null, prev[1]];
-      if (prev[1] === id) return [prev[0], null];
-      if (prev[0] === null) return [id, prev[1]];
-      if (prev[1] === null) return [prev[0], id];
-      // Both slots full — evict older, shift newer to older, place new
-      return [prev[1], id];
+      let next: [string | null, string | null];
+      if (prev[0] === id) next = [null, prev[1]];
+      else if (prev[1] === id) next = [prev[0], null];
+      else if (prev[0] === null) next = [id, prev[1]];
+      else if (prev[1] === null) next = [prev[0], id];
+      else next = [prev[1], id]; // evict oldest slot
+
+      // Enforce [older, newer] by version_no
+      const [a, b] = next;
+      if (a && b) {
+        const va = versions.find((v) => v.id === a)?.version_no ?? 0;
+        const vb = versions.find((v) => v.id === b)?.version_no ?? 0;
+        if (va > vb) return [b, a];
+      }
+      return next;
     });
   };
 

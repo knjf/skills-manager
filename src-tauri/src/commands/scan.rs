@@ -246,8 +246,9 @@ pub async fn import_all_discovered(store: State<'_, Arc<SkillStore>>) -> Result<
                         last_checked_at: Some(now),
                         last_check_error: None,
                     };
-                    store.insert_skill(&record).ok();
-                    installer::capture_install_version(&store, &id, &central_path);
+                    if store.insert_skill(&record).is_ok() {
+                        installer::capture_install_version(&store, &id, &central_path);
+                    }
 
                     // Link ALL discovered records with this name to the imported skill
                     let all_discovered = store.get_all_discovered().unwrap_or_default();

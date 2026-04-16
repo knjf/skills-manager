@@ -535,25 +535,13 @@ pub fn seed_default_packs(store: &SkillStore, force: bool) -> Result<SeedResult>
                     total_skills_assigned += 1;
 
                     // Best-effort: capture a version snapshot for each skill assigned to a pack.
-                    // This fires only when the pack doesn't exist yet (first seed or force reseed),
-                    // so it acts as an "import" baseline for skills that have a readable SKILL.md.
-                    let skill_md_path = std::path::Path::new(&skill.central_path).join("SKILL.md");
-                    if let Ok(content) = std::fs::read_to_string(&skill_md_path) {
-                        if let Err(err) =
-                            store.capture_version(&skill.id, &content, CaptureTrigger::Import)
-                        {
-                            log::warn!(
-                                "capture_version after pack seed failed for {}: {err}",
-                                skill.id
-                            );
-                        }
-                    } else {
-                        log::debug!(
-                            "capture_version skipped for {}: SKILL.md not readable at {}",
-                            skill.id,
-                            skill_md_path.display()
-                        );
-                    }
+                    // Fires only when the pack doesn't exist yet (first seed or force reseed),
+                    // acting as an "import" baseline for skills with a readable SKILL.md.
+                    crate::installer::capture_install_version(
+                        store,
+                        &skill.id,
+                        std::path::Path::new(&skill.central_path),
+                    );
                 }
                 None => {
                     let key = (*skill_name).to_string();

@@ -191,6 +191,7 @@ fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
         };
 
         store.insert_skill(&record)?;
+        crate::core::installer::capture_install_version(store, &record.id, &path);
     }
 
     Ok(())

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import type { FileData, HunkData } from "react-diff-view";
 import "react-diff-view/style/index.css";
@@ -35,6 +36,7 @@ function toUnifiedText(
 }
 
 export function DiffPane({ oldVersionId, newVersionId }: Props) {
+  const { t } = useTranslation();
   const [oldV, setOldV] = useState<VersionContent | null>(null);
   const [newV, setNewV] = useState<VersionContent | null>(null);
   const [hunks, setHunks] = useState<DiffHunk[]>([]);
@@ -72,17 +74,17 @@ export function DiffPane({ oldVersionId, newVersionId }: Props) {
   }, [oldVersionId, newVersionId]);
 
   if (loading)
-    return <div className="p-4 text-sm text-muted">Loading diff…</div>;
+    return <div className="p-4 text-sm text-muted">{t("history.loadingDiff")}</div>;
   if (error)
     return (
       <div className="p-4 text-sm text-danger">
-        Failed to load diff: {error}
+        {t("history.diffFailed", { error })}
       </div>
     );
   if (!oldV || !newV) return null;
   if (hunks.length === 0)
     return (
-      <div className="p-4 text-sm text-muted">Versions are identical.</div>
+      <div className="p-4 text-sm text-muted">{t("history.identical")}</div>
     );
 
   const unified = toUnifiedText(

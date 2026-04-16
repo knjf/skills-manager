@@ -110,11 +110,11 @@ export function Sidebar() {
   const NAV_ITEMS = [
     { name: t("sidebar.dashboard"), path: "/", icon: LayoutDashboard },
     { name: t("sidebar.mySkills"), path: "/my-skills", icon: Layers },
-    { name: "Packs", path: "/packs", icon: Package },
+    { name: t("sidebar.packs"), path: "/packs", icon: Package },
     { name: t("sidebar.installSkills"), path: "/install", icon: Download },
     { name: t("sidebar.matrix"), path: "/matrix", icon: Grid3X3 },
     { name: t("sidebar.plugins"), path: "/plugins", icon: Plug },
-    { name: "History", path: "/history", icon: History },
+    { name: t("sidebar.history"), path: "/history", icon: History },
   ];
 
   const handleSwitchScenario = async (id: string) => {

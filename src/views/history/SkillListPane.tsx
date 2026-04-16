@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SkillHistorySummary } from "../../types/history";
 import { cn } from "../../utils";
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function SkillListPane({ skills, loading, selectedId, onSelect }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -23,11 +25,11 @@ export function SkillListPane({ skills, loading, selectedId, onSelect }: Props) 
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search skills…"
+        placeholder={t("history.searchPlaceholder")}
         className="m-2 px-2 py-1 border border-border-subtle rounded text-sm bg-surface text-primary placeholder:text-faint focus:outline-none focus:border-accent"
       />
       {loading ? (
-        <div className="px-3 py-2 text-sm text-muted">Loading…</div>
+        <div className="px-3 py-2 text-sm text-muted">{t("history.loading")}</div>
       ) : (
         <ul className="flex-1 overflow-y-auto scrollbar-hide">
           {filtered.map((s) => (
@@ -41,19 +43,19 @@ export function SkillListPane({ skills, loading, selectedId, onSelect }: Props) 
             >
               <div className="font-medium text-sm text-primary">{s.name}</div>
               <div className="text-xs text-muted">
-                {s.source_type} · {s.version_count} versions
+                {s.source_type} · {t("history.metadata.versions", { count: s.version_count })}
               </div>
             </li>
           ))}
           {filtered.length === 0 && (
             <li className="px-3 py-2 text-sm text-faint">
-              No skills match &ldquo;{query}&rdquo;.
+              {t("history.noSkillsMatching", { query })}
             </li>
           )}
         </ul>
       )}
       <div className="text-xs text-faint p-2 border-t border-border-subtle">
-        {skills.length} skills total
+        {t("history.skillsTotal", { count: skills.length })}
       </div>
     </div>
   );

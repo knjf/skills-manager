@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listSkillsWithHistory, listVersions, restoreVersion } from "../lib/tauri";
 import type { SkillHistorySummary, VersionRecord } from "../types/history";
 import { SkillListPane } from "./history/SkillListPane";
@@ -8,6 +9,7 @@ import { DiffPane } from "./history/DiffPane";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
 export function HistoryView() {
+  const { t } = useTranslation();
   const [skills, setSkills] = useState<SkillHistorySummary[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [versions, setVersions] = useState<VersionRecord[]>([]);
@@ -18,6 +20,7 @@ export function HistoryView() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingSkills(true);
     listSkillsWithHistory()
       .then(setSkills)
@@ -27,6 +30,7 @@ export function HistoryView() {
 
   useEffect(() => {
     if (!selectedSkillId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVersions([]);
       return;
     }
@@ -39,6 +43,7 @@ export function HistoryView() {
 
   useEffect(() => {
     // versions is sorted newest-first; slot 0 = older, slot 1 = newer
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (versions.length >= 2) {
       setSelectedVersions([versions[1].id, versions[0].id]);
     } else if (versions.length === 1) {
@@ -46,6 +51,7 @@ export function HistoryView() {
     } else {
       setSelectedVersions([null, null]);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [versions]);
 
   const toggleVersion = (id: string) => {
@@ -96,9 +102,9 @@ export function HistoryView() {
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {!selectedSkill ? (
-          <div className="p-4 text-sm text-muted">Select a skill to view its history.</div>
+          <div className="p-4 text-sm text-muted">{t("history.selectSkill")}</div>
         ) : loadingVersions ? (
-          <div className="p-4 text-sm text-muted">Loading versions…</div>
+          <div className="p-4 text-sm text-muted">{t("history.loadingVersions")}</div>
         ) : (
           <>
             <MetadataPanel skill={selectedSkill} />
@@ -117,7 +123,7 @@ export function HistoryView() {
                 onClick={() => singleSelectedVersion && setRestoreTarget(singleSelectedVersion)}
                 className="ml-auto px-3 py-1 rounded border border-border-subtle text-sm disabled:opacity-40"
               >
-                Restore this version
+                {t("history.restore.button")}
               </button>
             </div>
             {selectedVersions[0] && selectedVersions[1] ? (
@@ -128,9 +134,9 @@ export function HistoryView() {
             ) : (
               <div className="p-4 text-sm text-muted">
                 {versions.length >= 2
-                  ? "Select two versions to compare."
+                  ? t("history.selectTwo")
                   : versions.length === 1
-                    ? "Only one version exists — nothing to compare."
+                    ? t("history.oneVersionOnly")
                     : ""}
               </div>
             )}
@@ -139,10 +145,10 @@ export function HistoryView() {
       </div>
       <ConfirmDialog
         open={restoreTarget !== null}
-        title={restoreTarget ? `Restore version v${restoreTarget.version_no}?` : ""}
-        message="This will write the content of this version back to the central library and re-sync the active scenario to every agent. The existing history is preserved — a new version is created pointing at this content."
+        title={restoreTarget ? t("history.restore.title", { version: restoreTarget.version_no }) : ""}
+        message={t("history.restore.message")}
         tone="warning"
-        confirmLabel="Restore"
+        confirmLabel={t("history.restore.confirm")}
         onClose={() => {
           setRestoreTarget(null);
           setRestoreError(null);

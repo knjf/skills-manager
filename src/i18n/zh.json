@@ -12,7 +12,9 @@
     "newScenario": "新建场景",
     "projects": "项目工作区",
     "addProject": "关联项目",
-    "settings": "设置"
+    "settings": "设置",
+    "history": "历史",
+    "packs": "技能包"
   },
   "help": {
     "eyebrow": "操作指南",
@@ -596,5 +598,52 @@
     "batchEnabled": "已启用 {{count}} 个 Skill",
     "batchDisabled": "已停用 {{count}} 个 Skill",
     "batchToggleFailed": "{{count}} 个 Skill 更新失败"
+  },
+  "history": {
+    "tab": "历史",
+    "searchPlaceholder": "搜索技能…",
+    "skillsTotal": "共 {{count}} 个技能",
+    "noSkillsMatching": "无匹配 \"{{query}}\" 的技能。",
+    "selectSkill": "请选择一个技能查看其历史。",
+    "loading": "加载中…",
+    "loadingVersions": "加载版本中…",
+    "loadingDiff": "加载差异中…",
+    "noHistory": "此技能尚未记录历史。",
+    "oneVersionOnly": "仅有一个版本 — 无可比较。",
+    "selectTwo": "请选择两个版本进行比较。",
+    "identical": "版本完全相同。",
+    "diffFailed": "加载差异失败: {{error}}",
+    "columns": {
+      "version": "版本",
+      "hash": "哈希",
+      "captured": "捕获时间",
+      "trigger": "触发方式"
+    },
+    "metadata": {
+      "versions": "{{count}} 个版本",
+      "imported": "导入",
+      "lastUpdate": "最后更新",
+      "lastCapture": "最后捕获",
+      "hash": "哈希",
+      "source": "来源"
+    },
+    "trigger": {
+      "scan": "扫描",
+      "import": "导入",
+      "backfill": "回填",
+      "restore": "恢复"
+    },
+    "restore": {
+      "button": "恢复此版本",
+      "title": "恢复版本 v{{version}}？",
+      "message": "这会将此版本的内容写回中央库并重新同步活动方案到所有代理。现有历史将保留 — 会创建指向此内容的新版本。",
+      "confirm": "恢复"
+    },
+    "relTime": {
+      "justNow": "刚刚",
+      "mAgo": "{{n}} 分钟前",
+      "hAgo": "{{n}} 小时前",
+      "dAgo": "{{n}} 天前"
+    }
   }
 }

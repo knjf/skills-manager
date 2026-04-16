@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { SkillHistorySummary } from "../../types/history";
 
 interface Props {
@@ -10,6 +11,8 @@ function formatTs(ts: number | null | undefined): string {
 }
 
 export function MetadataPanel({ skill }: Props) {
+  const { t } = useTranslation();
+
   return (
     <div className="border-b border-border-subtle p-3">
       <div className="flex items-center gap-2 mb-1">
@@ -25,16 +28,16 @@ export function MetadataPanel({ skill }: Props) {
         <div className="text-sm text-muted mb-1">{skill.description}</div>
       )}
       <div className="flex gap-4 text-xs text-muted">
-        <span>{skill.version_count} versions</span>
-        <span>imported: {formatTs(skill.created_at)}</span>
-        <span>last update: {formatTs(skill.updated_at)}</span>
+        <span>{t("history.metadata.versions", { count: skill.version_count })}</span>
+        <span>{t("history.metadata.imported")}: {formatTs(skill.created_at)}</span>
+        <span>{t("history.metadata.lastUpdate")}: {formatTs(skill.updated_at)}</span>
         {skill.latest_captured_at && (
-          <span>last capture: {formatTs(skill.latest_captured_at)}</span>
+          <span>{t("history.metadata.lastCapture")}: {formatTs(skill.latest_captured_at)}</span>
         )}
       </div>
       {skill.content_hash && (
         <div className="text-xs text-faint font-mono mt-1">
-          hash: {skill.content_hash.slice(0, 16)}…
+          {t("history.metadata.hash")}: {skill.content_hash.slice(0, 16)}…
         </div>
       )}
     </div>

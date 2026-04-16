@@ -532,6 +532,7 @@
     "oneVersionOnly": "只有一個版本 — 無得比較。",
     "selectTwo": "揀兩個版本嚟對比。",
     "identical": "版本完全相同。",
+    "comparing": "對比 v{{old}} → v{{new}}",
     "diffFailed": "載入差異失敗: {{error}}",
     "columns": {
       "version": "版本",

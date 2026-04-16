@@ -97,7 +97,7 @@ export function DiffPane({ oldVersionId, newVersionId }: Props) {
   return (
     <div className="flex-1 overflow-auto p-2 text-xs">
       <div className="mb-2 text-sm text-muted">
-        Comparing v{oldV.record.version_no} → v{newV.record.version_no}
+        {t("history.comparing", { old: oldV.record.version_no, new: newV.record.version_no })}
       </div>
       {files.map((file, i) => (
         <Diff

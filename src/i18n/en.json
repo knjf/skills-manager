@@ -612,6 +612,7 @@
     "oneVersionOnly": "Only one version exists — nothing to compare.",
     "selectTwo": "Select two versions to compare.",
     "identical": "Versions are identical.",
+    "comparing": "Comparing v{{old}} → v{{new}}",
     "diffFailed": "Failed to load diff: {{error}}",
     "columns": {
       "version": "Version",

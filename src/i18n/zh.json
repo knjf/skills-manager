@@ -612,6 +612,7 @@
     "oneVersionOnly": "仅有一个版本 — 无可比较。",
     "selectTwo": "请选择两个版本进行比较。",
     "identical": "版本完全相同。",
+    "comparing": "对比 v{{old}} → v{{new}}",
     "diffFailed": "加载差异失败: {{error}}",
     "columns": {
       "version": "版本",

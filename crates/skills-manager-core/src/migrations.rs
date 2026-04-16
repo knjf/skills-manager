@@ -1004,7 +1004,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 10);
+        assert_eq!(version, LATEST_VERSION);
 
         let count: i64 = conn
             .query_row(
@@ -1014,6 +1014,53 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn v8_to_v9_incremental_creates_table() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Create the minimal stub that migrate_v8_to_v9 depends on (skill_versions
+        // has a FK to skills(id); FK enforcement is OFF by default in-memory, so
+        // the stub schema is sufficient without all columns).
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS skills (id TEXT PRIMARY KEY, name TEXT NOT NULL);",
+        )
+        .unwrap();
+
+        // Seed one row to confirm cascade plumbing is in place (cheap but useful).
+        conn.execute("INSERT INTO skills (id, name) VALUES ('s1', 's1')", [])
+            .unwrap();
+
+        // Force the runner to enter migrate_v8_to_v9 rather than the fresh-DB path.
+        conn.pragma_update(None, "user_version", 8).unwrap();
+
+        run_migrations(&conn).unwrap();
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, LATEST_VERSION);
+
+        // skill_versions table must exist
+        let table_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='skill_versions'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_count, 1);
+
+        // index idx_skill_versions_skill_captured must exist
+        let index_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_skill_versions_skill_captured'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 1);
     }
 
     #[test]

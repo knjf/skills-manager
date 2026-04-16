@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { listSkillsWithHistory, listVersions } from "../lib/tauri";
+import { listSkillsWithHistory, listVersions, restoreVersion } from "../lib/tauri";
 import type { SkillHistorySummary, VersionRecord } from "../types/history";
 import { SkillListPane } from "./history/SkillListPane";
 import { MetadataPanel } from "./history/MetadataPanel";
 import { VersionListPane } from "./history/VersionListPane";
 import { DiffPane } from "./history/DiffPane";
+import { RestoreConfirmDialog } from "./history/RestoreConfirmDialog";
 
 export function HistoryView() {
   const [skills, setSkills] = useState<SkillHistorySummary[]>([]);
@@ -13,9 +14,11 @@ export function HistoryView() {
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<[string | null, string | null]>([null, null]);
+  const [restoreTarget, setRestoreTarget] = useState<VersionRecord | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingSkills(true);
     listSkillsWithHistory()
       .then(setSkills)
@@ -25,7 +28,6 @@ export function HistoryView() {
 
   useEffect(() => {
     if (!selectedSkillId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVersions([]);
       return;
     }
@@ -39,7 +41,6 @@ export function HistoryView() {
   useEffect(() => {
     // versions is sorted newest-first; slot 0 = older, slot 1 = newer
     if (versions.length >= 2) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedVersions([versions[1].id, versions[0].id]);
     } else if (versions.length === 1) {
       setSelectedVersions([null, versions[0].id]);
@@ -70,6 +71,22 @@ export function HistoryView() {
 
   const selectedSkill = skills.find((s) => s.id === selectedSkillId) ?? null;
 
+  // Exactly one version selected and it's not the latest
+  const singleSelectedVersion = (() => {
+    if (selectedVersions[0] && !selectedVersions[1]) {
+      return versions.find((v) => v.id === selectedVersions[0]) ?? null;
+    }
+    if (!selectedVersions[0] && selectedVersions[1]) {
+      return versions.find((v) => v.id === selectedVersions[1]) ?? null;
+    }
+    return null;
+  })();
+  const latestVersion = versions[0];
+  const canRestore =
+    singleSelectedVersion != null &&
+    latestVersion != null &&
+    singleSelectedVersion.id !== latestVersion.id;
+
   return (
     <div className="flex h-full">
       <SkillListPane
@@ -91,6 +108,19 @@ export function HistoryView() {
               selectedIds={selectedVersions}
               onToggle={toggleVersion}
             />
+            <div className="px-3 py-2 border-b border-border-subtle flex items-center justify-between gap-2">
+              {restoreError && (
+                <span className="text-xs text-danger">{restoreError}</span>
+              )}
+              <button
+                type="button"
+                disabled={!canRestore || restoreBusy}
+                onClick={() => singleSelectedVersion && setRestoreTarget(singleSelectedVersion)}
+                className="ml-auto px-3 py-1 rounded border border-border-subtle text-sm disabled:opacity-40"
+              >
+                Restore this version
+              </button>
+            </div>
             {selectedVersions[0] && selectedVersions[1] ? (
               <DiffPane
                 oldVersionId={selectedVersions[0]}
@@ -108,6 +138,34 @@ export function HistoryView() {
           </>
         )}
       </div>
+      {restoreTarget && (
+        <RestoreConfirmDialog
+          version={restoreTarget}
+          busy={restoreBusy}
+          onCancel={() => {
+            setRestoreTarget(null);
+            setRestoreError(null);
+          }}
+          onConfirm={async () => {
+            setRestoreBusy(true);
+            setRestoreError(null);
+            try {
+              await restoreVersion(restoreTarget.id);
+              // Reload versions after restore
+              if (selectedSkillId) {
+                const next = await listVersions(selectedSkillId);
+                setVersions(next);
+              }
+              setRestoreTarget(null);
+            } catch (err) {
+              console.error("restoreVersion failed", err);
+              setRestoreError(String(err));
+            } finally {
+              setRestoreBusy(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

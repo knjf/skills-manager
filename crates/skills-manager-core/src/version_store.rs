@@ -215,6 +215,47 @@ impl SkillStore {
         )?;
         Ok(target)
     }
+
+    /// Backfill: for each skill with no versions yet AND a readable SKILL.md,
+    /// capture v1 with trigger='backfill'. Failures are logged, not fatal.
+    /// Returns number of skills successfully backfilled.
+    pub fn backfill_initial_versions(&self) -> Result<usize> {
+        let skill_ids: Vec<(String, String)> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare(
+                "SELECT s.id, s.central_path
+                   FROM skills s
+                  WHERE NOT EXISTS (
+                      SELECT 1 FROM skill_versions v WHERE v.skill_id = s.id
+                  )",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+
+        let mut captured = 0usize;
+        for (skill_id, central_path) in skill_ids {
+            let skill_md = std::path::Path::new(&central_path).join("SKILL.md");
+            match std::fs::read_to_string(&skill_md) {
+                Ok(content) => {
+                    match self.capture_version(&skill_id, &content, CaptureTrigger::Backfill) {
+                        Ok(Some(_)) => captured += 1,
+                        Ok(None) => {}
+                        Err(err) => log::warn!("backfill failed for skill {skill_id}: {err}"),
+                    }
+                }
+                Err(err) => {
+                    log::info!(
+                        "backfill skipped {skill_id} ({}): {err}",
+                        skill_md.display()
+                    );
+                }
+            }
+        }
+        Ok(captured)
+    }
 }
 
 fn map_version_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<VersionRecord> {
@@ -417,5 +458,70 @@ mod tests {
         let _ = store.restore_version(&v1.id).unwrap();
         let versions = store.list_versions("s1").unwrap();
         assert_eq!(versions.len(), 1);
+    }
+
+    #[test]
+    fn backfill_creates_v1_for_skills_with_readable_content() {
+        use std::fs;
+        let (tmp, store) = make_store();
+
+        let central_a = tmp.path().join("skills/a");
+        fs::create_dir_all(&central_a).unwrap();
+        fs::write(central_a.join("SKILL.md"), "---\nname: a\n---\nbody A\n").unwrap();
+
+        let central_b = tmp.path().join("skills/b");
+        fs::create_dir_all(&central_b).unwrap();
+        fs::write(central_b.join("SKILL.md"), "---\nname: b\n---\nbody B\n").unwrap();
+
+        let mut rec_a = sample_skill_record("a");
+        rec_a.central_path = central_a.to_string_lossy().to_string();
+        store.insert_skill(&rec_a).unwrap();
+
+        let mut rec_b = sample_skill_record("b");
+        rec_b.central_path = central_b.to_string_lossy().to_string();
+        store.insert_skill(&rec_b).unwrap();
+
+        let n = store.backfill_initial_versions().unwrap();
+        assert_eq!(n, 2);
+
+        assert_eq!(store.list_versions("a").unwrap().len(), 1);
+        assert_eq!(store.list_versions("b").unwrap().len(), 1);
+        assert_eq!(store.list_versions("a").unwrap()[0].trigger, "backfill");
+    }
+
+    #[test]
+    fn backfill_skips_skills_without_readable_content() {
+        let (tmp, store) = make_store();
+
+        let mut rec = sample_skill_record("ghost");
+        rec.central_path = tmp
+            .path()
+            .join("nowhere/ghost")
+            .to_string_lossy()
+            .to_string();
+        store.insert_skill(&rec).unwrap();
+
+        let n = store.backfill_initial_versions().unwrap();
+        assert_eq!(n, 0);
+        assert!(store.list_versions("ghost").unwrap().is_empty());
+    }
+
+    #[test]
+    fn backfill_is_idempotent_for_skills_with_existing_versions() {
+        let (tmp, store) = make_store();
+        use std::fs;
+        let central = tmp.path().join("skills/s");
+        fs::create_dir_all(&central).unwrap();
+        fs::write(central.join("SKILL.md"), "content\n").unwrap();
+
+        let mut rec = sample_skill_record("s");
+        rec.central_path = central.to_string_lossy().to_string();
+        store.insert_skill(&rec).unwrap();
+
+        // First backfill captures v1
+        assert_eq!(store.backfill_initial_versions().unwrap(), 1);
+        // Second call should be a no-op — skill already has versions
+        assert_eq!(store.backfill_initial_versions().unwrap(), 0);
+        assert_eq!(store.list_versions("s").unwrap().len(), 1);
     }
 }

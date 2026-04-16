@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Current schema version. Bump this when adding a new migration.
-const LATEST_VERSION: u32 = 9;
+const LATEST_VERSION: u32 = 10;
 
 const PLUGINS_SCHEMA_DDL: &str = "
     CREATE TABLE IF NOT EXISTS managed_plugins (
@@ -116,6 +116,7 @@ fn migrate_step(conn: &Connection, from_version: u32) -> Result<()> {
         6 => migrate_v6_to_v7(conn),
         7 => migrate_v7_to_v8(conn),
         8 => migrate_v8_to_v9(conn),
+        9 => migrate_v9_to_v10(conn),
         _ => bail!("unknown migration version: {from_version}"),
     }
 }
@@ -210,6 +211,23 @@ fn migrate_v0_to_v1(conn: &Connection) -> Result<()> {
             updated_at INTEGER NOT NULL,
             PRIMARY KEY(scenario_id, skill_id, tool)
         );
+
+        CREATE TABLE IF NOT EXISTS skill_versions (
+            id                  TEXT PRIMARY KEY,
+            skill_id            TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+            version_no          INTEGER NOT NULL,
+            content             TEXT NOT NULL,
+            content_hash        TEXT NOT NULL,
+            byte_size           INTEGER NOT NULL,
+            captured_at         INTEGER NOT NULL,
+            trigger             TEXT NOT NULL,
+            source_type         TEXT NOT NULL,
+            source_ref          TEXT,
+            source_ref_resolved TEXT,
+            UNIQUE(skill_id, version_no)
+        );
+        CREATE INDEX IF NOT EXISTS idx_skill_versions_skill_captured
+            ON skill_versions(skill_id, captured_at DESC);
 
         CREATE TABLE IF NOT EXISTS active_scenario (
             key TEXT PRIMARY KEY DEFAULT 'current',
@@ -382,6 +400,31 @@ fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
         .context("v8→v9: create idx_scenarios_mode")?;
     }
 
+    Ok(())
+}
+
+/// v9 → v10: Add skill_versions table for version history.
+fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS skill_versions (
+            id                  TEXT PRIMARY KEY,
+            skill_id            TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+            version_no          INTEGER NOT NULL,
+            content             TEXT NOT NULL,
+            content_hash        TEXT NOT NULL,
+            byte_size           INTEGER NOT NULL,
+            captured_at         INTEGER NOT NULL,
+            trigger             TEXT NOT NULL,
+            source_type         TEXT NOT NULL,
+            source_ref          TEXT,
+            source_ref_resolved TEXT,
+            UNIQUE(skill_id, version_no)
+        );
+        CREATE INDEX IF NOT EXISTS idx_skill_versions_skill_captured
+            ON skill_versions(skill_id, captured_at DESC);
+        ",
+    )?;
     Ok(())
 }
 
@@ -948,6 +991,29 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn v9_to_v10_creates_skill_versions_table() {
+        use rusqlite::Connection;
+        let conn = Connection::open_in_memory().unwrap();
+        // Fresh in-memory DB: run_migrations walks v0→LATEST_VERSION in one go;
+        // assert skill_versions exists and version is up to date.
+        run_migrations(&conn).unwrap();
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 10);
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='skill_versions'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]

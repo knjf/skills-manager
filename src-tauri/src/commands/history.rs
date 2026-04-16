@@ -4,6 +4,7 @@ use tauri::State;
 
 use crate::core::{
     diff::{compute_diff, DiffHunk},
+    error::AppError,
     skill_store::SkillStore,
     version_store::{VersionContent, VersionRecord},
 };
@@ -26,13 +27,13 @@ pub struct SkillHistorySummary {
 #[tauri::command]
 pub async fn list_skills_with_history(
     store: State<'_, Arc<SkillStore>>,
-) -> Result<Vec<SkillHistorySummary>, String> {
+) -> Result<Vec<SkillHistorySummary>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let skills = store.get_all_skills().map_err(|e| e.to_string())?;
+        let skills = store.get_all_skills().map_err(AppError::db)?;
         let mut out = Vec::with_capacity(skills.len());
         for s in skills {
-            let versions = store.list_versions(&s.id).map_err(|e| e.to_string())?;
+            let versions = store.list_versions(&s.id).map_err(AppError::db)?;
             let latest_captured_at = versions.first().map(|v| v.captured_at);
             out.push(SkillHistorySummary {
                 id: s.id,
@@ -56,34 +57,31 @@ pub async fn list_skills_with_history(
         });
         Ok(out)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn list_versions(
     store: State<'_, Arc<SkillStore>>,
     skill_id: String,
-) -> Result<Vec<VersionRecord>, String> {
+) -> Result<Vec<VersionRecord>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        store.list_versions(&skill_id).map_err(|e| e.to_string())
+        store.list_versions(&skill_id).map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
 pub async fn get_version(
     store: State<'_, Arc<SkillStore>>,
     version_id: String,
-) -> Result<VersionContent, String> {
+) -> Result<VersionContent, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        store.get_version(&version_id).map_err(|e| e.to_string())
+        store.get_version(&version_id).map_err(AppError::db)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }
 
 #[tauri::command]
@@ -91,13 +89,17 @@ pub async fn diff_versions(
     store: State<'_, Arc<SkillStore>>,
     old_id: String,
     new_id: String,
-) -> Result<Vec<DiffHunk>, String> {
+) -> Result<Vec<DiffHunk>, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let old = store.get_version(&old_id).map_err(|e| e.to_string())?;
-        let new = store.get_version(&new_id).map_err(|e| e.to_string())?;
+        let old = store.get_version(&old_id).map_err(AppError::db)?;
+        let new = store.get_version(&new_id).map_err(AppError::db)?;
+        if old.record.skill_id != new.record.skill_id {
+            return Err(AppError::invalid_input(
+                "version IDs must belong to the same skill",
+            ));
+        }
         Ok(compute_diff(&old.content, &new.content, 3))
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
 }

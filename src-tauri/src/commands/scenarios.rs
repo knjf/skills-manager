@@ -551,6 +551,16 @@ pub(crate) fn sync_scenario_skills(store: &SkillStore, scenario_id: &str) -> Res
     Ok(())
 }
 
+/// Re-sync whichever scenario is currently active across all managed agents.
+/// Called after a restore to ensure all agents see the updated file content.
+pub(crate) fn sync_current_scenario_internal(store: &SkillStore) -> Result<(), AppError> {
+    let active_id = store.get_active_scenario_id().map_err(AppError::db)?;
+    if let Some(id) = active_id {
+        sync_scenario_skills(store, &id)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn unsync_scenario_skills(
     store: &SkillStore,
     scenario_id: &str,

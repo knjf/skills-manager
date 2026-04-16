@@ -103,3 +103,66 @@ pub async fn diff_versions(
     })
     .await?
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestoreResult {
+    pub skill_id: String,
+    pub new_version_no: Option<i64>,
+    pub no_op: bool,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn restore_version(
+    state: State<'_, Arc<SkillStore>>,
+    version_id: String,
+) -> Result<RestoreResult, AppError> {
+    let store = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<RestoreResult, AppError> {
+        let target = store.get_version(&version_id).map_err(AppError::db)?;
+
+        // Short-circuit if target is already the latest version
+        if let Some(latest) = store
+            .latest_version(&target.record.skill_id)
+            .map_err(AppError::db)?
+        {
+            if latest.id == version_id {
+                return Ok(RestoreResult {
+                    skill_id: target.record.skill_id,
+                    new_version_no: None,
+                    no_op: true,
+                    message: "target is already the latest version".to_string(),
+                });
+            }
+        }
+
+        // Resolve central_path and write the SKILL.md
+        let skill = store
+            .get_skill_by_id(&target.record.skill_id)
+            .map_err(AppError::db)?
+            .ok_or_else(|| AppError::not_found("skill not found"))?;
+        let skill_md = std::path::Path::new(&skill.central_path).join("SKILL.md");
+
+        std::fs::write(&skill_md, &target.content).map_err(|e| {
+            AppError::io(format!("failed to write {}: {e}", skill_md.display()))
+        })?;
+
+        // Capture new version with trigger=restore
+        let new_version_content = store
+            .restore_version(&version_id)
+            .map_err(AppError::db)?;
+
+        // Trigger re-sync of active scenario so all agents receive restored content
+        if let Err(err) = crate::commands::scenarios::sync_current_scenario_internal(&store) {
+            log::warn!("scenario sync after restore failed: {err}");
+        }
+
+        Ok(RestoreResult {
+            skill_id: new_version_content.record.skill_id,
+            new_version_no: Some(new_version_content.record.version_no),
+            no_op: false,
+            message: "restored".to_string(),
+        })
+    })
+    .await?
+}

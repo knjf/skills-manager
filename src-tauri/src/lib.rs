@@ -359,6 +359,18 @@ pub fn run() {
 
     let cancel_registry = Arc::new(core::install_cancel::InstallCancelRegistry::new());
 
+    // Backfill initial versions for any skills that were added before the
+    // version-history feature was introduced.  Runs in a background thread so
+    // startup is never blocked by I/O across 132+ skills.
+    let store_for_backfill = Arc::clone(&store);
+    std::thread::spawn(move || {
+        match store_for_backfill.backfill_initial_versions() {
+            Ok(n) if n > 0 => log::info!("backfilled {n} initial skill versions"),
+            Ok(_) => {}
+            Err(err) => log::warn!("initial skill version backfill failed: {err}"),
+        }
+    });
+
     tauri::Builder::default()
         .manage(store)
         .manage(cancel_registry)
@@ -520,6 +532,12 @@ pub fn run() {
             commands::agents::import_discovered_skill,
             commands::agents::mark_skill_as_native,
             commands::agents::unmark_skill_as_native,
+            // History
+            commands::history::list_skills_with_history,
+            commands::history::list_versions,
+            commands::history::get_version,
+            commands::history::diff_versions,
+            commands::history::restore_version,
             // Scenarios
             commands::scenarios::get_scenarios,
             commands::scenarios::get_active_scenario,

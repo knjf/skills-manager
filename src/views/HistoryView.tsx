@@ -4,6 +4,7 @@ import type { SkillHistorySummary, VersionRecord } from "../types/history";
 import { SkillListPane } from "./history/SkillListPane";
 import { MetadataPanel } from "./history/MetadataPanel";
 import { VersionListPane } from "./history/VersionListPane";
+import { DiffPane } from "./history/DiffPane";
 
 export function HistoryView() {
   const [skills, setSkills] = useState<SkillHistorySummary[]>([]);
@@ -90,13 +91,20 @@ export function HistoryView() {
               selectedIds={selectedVersions}
               onToggle={toggleVersion}
             />
-            <div className="p-4 text-sm text-muted">
-              {selectedVersions[0] && selectedVersions[1]
-                ? "Diff goes here (Task 14)"
-                : versions.length >= 2
+            {selectedVersions[0] && selectedVersions[1] ? (
+              <DiffPane
+                oldVersionId={selectedVersions[0]}
+                newVersionId={selectedVersions[1]}
+              />
+            ) : (
+              <div className="p-4 text-sm text-muted">
+                {versions.length >= 2
                   ? "Select two versions to compare."
-                  : "Only one version exists — nothing to compare."}
-            </div>
+                  : versions.length === 1
+                    ? "Only one version exists — nothing to compare."
+                    : ""}
+              </div>
+            )}
           </>
         )}
       </div>

@@ -148,9 +148,15 @@ pub async fn restore_version(
         })?;
 
         // Capture new version with trigger=restore
-        let new_version_content = store
+        store
             .restore_version(&version_id)
             .map_err(AppError::db)?;
+
+        // Fetch the newly-captured version's number
+        let new_latest = store
+            .latest_version(&target.record.skill_id)
+            .map_err(AppError::db)?;
+        let new_version_no = new_latest.as_ref().map(|v| v.version_no);
 
         // Trigger re-sync of active scenario so all agents receive restored content
         if let Err(err) = crate::commands::scenarios::sync_current_scenario_internal(&store) {
@@ -158,8 +164,8 @@ pub async fn restore_version(
         }
 
         Ok(RestoreResult {
-            skill_id: new_version_content.record.skill_id,
-            new_version_no: Some(new_version_content.record.version_no),
+            skill_id: target.record.skill_id,
+            new_version_no,
             no_op: false,
             message: "restored".to_string(),
         })

@@ -242,7 +242,10 @@ impl SkillStore {
                 Ok(content) => {
                     match self.capture_version(&skill_id, &content, CaptureTrigger::Backfill) {
                         Ok(Some(_)) => captured += 1,
-                        Ok(None) => {}
+                        Ok(None) => log::warn!(
+                            "backfill: capture_version returned None for {skill_id} \
+                             (hash collision or concurrent write — skipping)"
+                        ),
                         Err(err) => log::warn!("backfill failed for skill {skill_id}: {err}"),
                     }
                 }

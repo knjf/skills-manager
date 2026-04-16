@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod browse;
 pub mod git_backup;
+pub mod history;
 pub mod packs;
 pub mod plugins;
 pub mod projects;

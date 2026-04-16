@@ -825,6 +825,11 @@ pub async fn update_skill(
                         "up_to_date",
                     )
                     .map_err(AppError::db)?;
+                installer::capture_install_version(
+                    &store,
+                    &skill.id,
+                    Path::new(&skill.central_path),
+                );
                 resync_copy_targets(&store, &skill.id)?;
             } else {
                 // Content identical — just update git metadata, skip file swap.
@@ -927,6 +932,7 @@ pub async fn reimport_local_skill(
                     "local_only",
                 )
                 .map_err(AppError::db)?;
+            installer::capture_install_version(&store, &skill.id, Path::new(&skill.central_path));
             resync_copy_targets(&store, &skill.id)?;
             Ok(())
         })();
@@ -1000,6 +1006,7 @@ pub async fn relink_local_skill_source(
                     "local_only",
                 )
                 .map_err(AppError::db)?;
+            installer::capture_install_version(&store, &skill.id, Path::new(&skill.central_path));
             resync_copy_targets(&store, &skill.id)?;
             Ok(())
         })();
@@ -1143,6 +1150,8 @@ fn store_installed_skill(
             )
             .map_err(AppError::db)?;
 
+        installer::capture_install_version(store, &existing.id, &result.central_path);
+
         if let Some(scenario_id) = active_scenario_id {
             store
                 .add_skill_to_scenario(scenario_id, &existing.id)
@@ -1177,6 +1186,7 @@ fn store_installed_skill(
     };
 
     store.insert_skill(&record).map_err(AppError::db)?;
+    installer::capture_install_version(store, &id, &result.central_path);
 
     if let Some(scenario_id) = active_scenario_id {
         store

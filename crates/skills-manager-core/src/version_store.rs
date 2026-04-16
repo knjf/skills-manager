@@ -216,6 +216,38 @@ impl SkillStore {
         Ok(target)
     }
 
+    /// Re-read every skill's SKILL.md and capture a new version if content changed.
+    /// Returns number of skills that produced a new version.
+    pub fn rescan_central_library(&self) -> Result<usize> {
+        let skills: Vec<(String, String)> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare("SELECT id, central_path FROM skills")?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            let result = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+            result
+        };
+
+        let mut captured = 0usize;
+        for (skill_id, central_path) in skills {
+            let skill_md = std::path::Path::new(&central_path).join("SKILL.md");
+            match std::fs::read_to_string(&skill_md) {
+                Ok(content) => {
+                    match self.capture_version(&skill_id, &content, CaptureTrigger::Scan) {
+                        Ok(Some(_)) => captured += 1,
+                        Ok(None) => {}
+                        Err(err) => log::warn!("rescan capture failed for {skill_id}: {err}"),
+                    }
+                }
+                Err(_) => {
+                    // skill dir removed or unreadable — ignore silently
+                }
+            }
+        }
+        Ok(captured)
+    }
+
     /// Backfill: for each skill with no versions yet AND a readable SKILL.md,
     /// capture v1 with trigger='backfill'. Failures are logged, not fatal.
     /// Returns number of skills successfully backfilled.
@@ -526,5 +558,49 @@ mod tests {
         // Second call should be a no-op — skill already has versions
         assert_eq!(store.backfill_initial_versions().unwrap(), 0);
         assert_eq!(store.list_versions("s").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn rescan_detects_external_edit_and_captures_new_version() {
+        use std::fs;
+        let (tmp, store) = make_store();
+
+        let central = tmp.path().join("skills/s1");
+        fs::create_dir_all(&central).unwrap();
+        fs::write(central.join("SKILL.md"), "v1 content\n").unwrap();
+
+        let mut rec = sample_skill_record("s1");
+        rec.central_path = central.to_string_lossy().to_string();
+        store.insert_skill(&rec).unwrap();
+        store.backfill_initial_versions().unwrap();
+
+        // External edit
+        fs::write(central.join("SKILL.md"), "v2 content\n").unwrap();
+
+        let captured = store.rescan_central_library().unwrap();
+        assert_eq!(captured, 1);
+
+        let versions = store.list_versions("s1").unwrap();
+        assert_eq!(versions.len(), 2);
+        assert_eq!(versions[0].version_no, 2);
+        assert_eq!(versions[0].trigger, "scan");
+    }
+
+    #[test]
+    fn rescan_is_noop_when_no_content_changed() {
+        use std::fs;
+        let (tmp, store) = make_store();
+
+        let central = tmp.path().join("skills/s1");
+        fs::create_dir_all(&central).unwrap();
+        fs::write(central.join("SKILL.md"), "stable content\n").unwrap();
+
+        let mut rec = sample_skill_record("s1");
+        rec.central_path = central.to_string_lossy().to_string();
+        store.insert_skill(&rec).unwrap();
+        store.backfill_initial_versions().unwrap();
+
+        assert_eq!(store.rescan_central_library().unwrap(), 0);
+        assert_eq!(store.list_versions("s1").unwrap().len(), 1);
     }
 }

@@ -137,6 +137,12 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
                     if !should_emit(&event) || last_emit.elapsed() < WATCH_EMIT_DEBOUNCE {
                         continue;
                     }
+                    let store_clone = Arc::clone(&store);
+                    std::thread::spawn(move || {
+                        if let Err(err) = store_clone.rescan_central_library() {
+                            log::debug!("rescan_central_library after fs event failed: {err}");
+                        }
+                    });
                     if let Err(err) = app.emit(APP_FS_CHANGED_EVENT, ()) {
                         log::debug!("Failed to emit app-files-changed: {err}");
                     } else {

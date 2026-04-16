@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 import { listSkillsWithHistory, listVersions, restoreVersion } from "../lib/tauri";
 import type { SkillHistorySummary, VersionRecord } from "../types/history";
 import { SkillListPane } from "./history/SkillListPane";
@@ -53,6 +54,27 @@ export function HistoryView() {
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [versions]);
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const unlisten = listen("app-files-changed", () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        listSkillsWithHistory()
+          .then(setSkills)
+          .catch((e) => console.error("refresh skills failed", e));
+        if (selectedSkillId) {
+          listVersions(selectedSkillId)
+            .then(setVersions)
+            .catch((e) => console.error("refresh versions failed", e));
+        }
+      }, 500);
+    });
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, [selectedSkillId]);
 
   const toggleVersion = (id: string) => {
     setSelectedVersions((prev) => {

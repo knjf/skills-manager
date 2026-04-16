@@ -216,12 +216,37 @@ impl SkillStore {
         Ok(target)
     }
 
+    /// Returns a map from skill_id -> (version_count, latest_captured_at).
+    /// Skills with no versions are not present in the map.
+    pub fn version_summary_map(&self) -> Result<std::collections::HashMap<String, (i64, i64)>> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT skill_id, COUNT(*), MAX(captured_at)
+               FROM skill_versions
+              GROUP BY skill_id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+        let mut map = std::collections::HashMap::new();
+        for r in rows {
+            let (id, count, ts) = r?;
+            map.insert(id, (count, ts));
+        }
+        Ok(map)
+    }
+
     /// Re-read every skill's SKILL.md and capture a new version if content changed.
     /// Returns number of skills that produced a new version.
     pub fn rescan_central_library(&self) -> Result<usize> {
         let skills: Vec<(String, String)> = {
             let conn = self.conn();
-            let mut stmt = conn.prepare("SELECT id, central_path FROM skills")?;
+            let mut stmt =
+                conn.prepare("SELECT id, central_path FROM skills WHERE source_type != 'native'")?;
             let rows = stmt.query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })?;
@@ -257,9 +282,10 @@ impl SkillStore {
             let mut stmt = conn.prepare(
                 "SELECT s.id, s.central_path
                    FROM skills s
-                  WHERE NOT EXISTS (
-                      SELECT 1 FROM skill_versions v WHERE v.skill_id = s.id
-                  )",
+                  WHERE s.source_type != 'native'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM skill_versions v WHERE v.skill_id = s.id
+                    )",
             )?;
             let rows = stmt.query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))

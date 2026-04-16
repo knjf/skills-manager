@@ -26,29 +26,35 @@ pub struct SkillHistorySummary {
 
 #[tauri::command]
 pub async fn list_skills_with_history(
-    store: State<'_, Arc<SkillStore>>,
+    state: State<'_, Arc<SkillStore>>,
 ) -> Result<Vec<SkillHistorySummary>, AppError> {
-    let store = store.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let store = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<Vec<SkillHistorySummary>, AppError> {
         let skills = store.get_all_skills().map_err(AppError::db)?;
-        let mut out = Vec::with_capacity(skills.len());
-        for s in skills {
-            let versions = store.list_versions(&s.id).map_err(AppError::db)?;
-            let latest_captured_at = versions.first().map(|v| v.captured_at);
-            out.push(SkillHistorySummary {
-                id: s.id,
-                name: s.name,
-                description: s.description,
-                source_type: s.source_type,
-                source_ref: s.source_ref,
-                source_ref_resolved: s.source_ref_resolved,
-                content_hash: s.content_hash,
-                created_at: s.created_at,
-                updated_at: s.updated_at,
-                version_count: versions.len() as i64,
-                latest_captured_at,
-            });
-        }
+        let summary_map = store.version_summary_map().map_err(AppError::db)?;
+        let mut out: Vec<SkillHistorySummary> = skills
+            .into_iter()
+            .filter(|s| s.source_type != "native")
+            .map(|s| {
+                let (version_count, latest_captured_at) = match summary_map.get(&s.id) {
+                    Some((c, t)) => (*c, Some(*t)),
+                    None => (0, None),
+                };
+                SkillHistorySummary {
+                    id: s.id,
+                    name: s.name,
+                    description: s.description,
+                    source_type: s.source_type,
+                    source_ref: s.source_ref,
+                    source_ref_resolved: s.source_ref_resolved,
+                    content_hash: s.content_hash,
+                    created_at: s.created_at,
+                    updated_at: s.updated_at,
+                    version_count,
+                    latest_captured_at,
+                }
+            })
+            .collect();
         // Most recently captured first, ties by name
         out.sort_by(|a, b| {
             b.latest_captured_at

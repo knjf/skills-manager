@@ -173,6 +173,48 @@ impl SkillStore {
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
+
+    pub fn get_version(&self, version_id: &str) -> Result<VersionContent> {
+        let conn = self.conn();
+        let (record, content): (VersionRecord, String) = conn.query_row(
+            "SELECT id, skill_id, version_no, content_hash, byte_size, captured_at,
+                    trigger, source_type, source_ref, source_ref_resolved, content
+               FROM skill_versions
+              WHERE id = ?1",
+            params![version_id],
+            |row| {
+                let rec = VersionRecord {
+                    id: row.get(0)?,
+                    skill_id: row.get(1)?,
+                    version_no: row.get(2)?,
+                    content_hash: row.get(3)?,
+                    byte_size: row.get(4)?,
+                    captured_at: row.get(5)?,
+                    trigger: row.get(6)?,
+                    source_type: row.get(7)?,
+                    source_ref: row.get(8)?,
+                    source_ref_resolved: row.get(9)?,
+                };
+                let content: String = row.get(10)?;
+                Ok((rec, content))
+            },
+        )?;
+        Ok(VersionContent { record, content })
+    }
+
+    /// Copies the specified version's content into a fresh snapshot (if it
+    /// differs from latest) and returns the full VersionContent for callers
+    /// to persist to the central library. If restoring the latest, capture is
+    /// a no-op but the original VersionContent is still returned unchanged.
+    pub fn restore_version(&self, version_id: &str) -> Result<VersionContent> {
+        let target = self.get_version(version_id)?;
+        let _ = self.capture_version(
+            &target.record.skill_id,
+            &target.content,
+            CaptureTrigger::Restore,
+        )?;
+        Ok(target)
+    }
 }
 
 fn map_version_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<VersionRecord> {
@@ -324,5 +366,56 @@ mod tests {
 
         let versions = store.list_versions("s1").unwrap();
         assert!(versions.is_empty());
+    }
+
+    #[test]
+    fn get_version_returns_content() {
+        let (_tmp, store) = make_store();
+        store.insert_skill(&sample_skill_record("s1")).unwrap();
+        let rec = store
+            .capture_version("s1", "hello", CaptureTrigger::Scan)
+            .unwrap()
+            .unwrap();
+
+        let fetched = store.get_version(&rec.id).unwrap();
+        assert_eq!(fetched.content, "hello");
+        assert_eq!(fetched.record.version_no, 1);
+    }
+
+    #[test]
+    fn restore_older_version_captures_new_row() {
+        let (_tmp, store) = make_store();
+        store.insert_skill(&sample_skill_record("s1")).unwrap();
+        let v1 = store
+            .capture_version("s1", "A", CaptureTrigger::Scan)
+            .unwrap()
+            .unwrap();
+        store
+            .capture_version("s1", "B", CaptureTrigger::Scan)
+            .unwrap();
+
+        let result = store.restore_version(&v1.id).unwrap();
+        assert_eq!(result.content, "A");
+
+        let versions = store.list_versions("s1").unwrap();
+        // Newest first: v3 restore, v2 B, v1 A
+        assert_eq!(versions.len(), 3);
+        assert_eq!(versions[0].version_no, 3);
+        assert_eq!(versions[0].trigger, "restore");
+        assert_eq!(versions[0].content_hash, v1.content_hash);
+    }
+
+    #[test]
+    fn restore_latest_is_noop() {
+        let (_tmp, store) = make_store();
+        store.insert_skill(&sample_skill_record("s1")).unwrap();
+        let v1 = store
+            .capture_version("s1", "A", CaptureTrigger::Scan)
+            .unwrap()
+            .unwrap();
+
+        let _ = store.restore_version(&v1.id).unwrap();
+        let versions = store.list_versions("s1").unwrap();
+        assert_eq!(versions.len(), 1);
     }
 }

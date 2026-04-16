@@ -21,6 +21,7 @@ pub mod skillsmp_api;
 pub mod skillssh_api;
 pub mod sync_engine;
 pub mod tool_adapters;
+pub mod version_store;
 
 // Re-export commonly used types
 pub use dedup::DedupResult;
@@ -32,3 +33,4 @@ pub use skill_store::{
     ScenarioSkillToolToggleRecord, SkillRecord, SkillStore, SkillTargetRecord,
 };
 pub use sync_engine::SyncMode;
+pub use version_store::{CaptureTrigger, VersionContent, VersionRecord};

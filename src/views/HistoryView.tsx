@@ -5,7 +5,7 @@ import { SkillListPane } from "./history/SkillListPane";
 import { MetadataPanel } from "./history/MetadataPanel";
 import { VersionListPane } from "./history/VersionListPane";
 import { DiffPane } from "./history/DiffPane";
-import { RestoreConfirmDialog } from "./history/RestoreConfirmDialog";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 export function HistoryView() {
   const [skills, setSkills] = useState<SkillHistorySummary[]>([]);
@@ -15,7 +15,6 @@ export function HistoryView() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<[string | null, string | null]>([null, null]);
   const [restoreTarget, setRestoreTarget] = useState<VersionRecord | null>(null);
-  const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,7 +113,7 @@ export function HistoryView() {
               )}
               <button
                 type="button"
-                disabled={!canRestore || restoreBusy}
+                disabled={!canRestore}
                 onClick={() => singleSelectedVersion && setRestoreTarget(singleSelectedVersion)}
                 className="ml-auto px-3 py-1 rounded border border-border-subtle text-sm disabled:opacity-40"
               >
@@ -138,34 +137,33 @@ export function HistoryView() {
           </>
         )}
       </div>
-      {restoreTarget && (
-        <RestoreConfirmDialog
-          version={restoreTarget}
-          busy={restoreBusy}
-          onCancel={() => {
-            setRestoreTarget(null);
-            setRestoreError(null);
-          }}
-          onConfirm={async () => {
-            setRestoreBusy(true);
-            setRestoreError(null);
-            try {
-              await restoreVersion(restoreTarget.id);
-              // Reload versions after restore
-              if (selectedSkillId) {
-                const next = await listVersions(selectedSkillId);
-                setVersions(next);
-              }
-              setRestoreTarget(null);
-            } catch (err) {
-              console.error("restoreVersion failed", err);
-              setRestoreError(String(err));
-            } finally {
-              setRestoreBusy(false);
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        title={restoreTarget ? `Restore version v${restoreTarget.version_no}?` : ""}
+        message="This will write the content of this version back to the central library and re-sync the active scenario to every agent. The existing history is preserved — a new version is created pointing at this content."
+        tone="warning"
+        confirmLabel="Restore"
+        onClose={() => {
+          setRestoreTarget(null);
+          setRestoreError(null);
+        }}
+        onConfirm={async () => {
+          if (!restoreTarget) return;
+          setRestoreError(null);
+          try {
+            await restoreVersion(restoreTarget.id);
+            if (selectedSkillId) {
+              const next = await listVersions(selectedSkillId);
+              setVersions(next);
             }
-          }}
-        />
-      )}
+            setRestoreTarget(null);
+          } catch (err) {
+            console.error("restoreVersion failed", err);
+            setRestoreError(String(err));
+            throw err;
+          }
+        }}
+      />
     </div>
   );
 }

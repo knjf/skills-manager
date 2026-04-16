@@ -8,6 +8,7 @@ import {
   Download,
   Grid3X3,
   Plug,
+  History,
   Settings,
   Plus,
   Pencil,
@@ -113,6 +114,7 @@ export function Sidebar() {
     { name: t("sidebar.installSkills"), path: "/install", icon: Download },
     { name: t("sidebar.matrix"), path: "/matrix", icon: Grid3X3 },
     { name: t("sidebar.plugins"), path: "/plugins", icon: Plug },
+    { name: "History", path: "/history", icon: History },
   ];
 
   const handleSwitchScenario = async (id: string) => {

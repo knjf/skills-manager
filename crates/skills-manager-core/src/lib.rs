@@ -3,6 +3,7 @@ pub mod central_repo;
 pub mod content_hash;
 pub mod crypto;
 pub mod dedup;
+pub mod diff;
 pub mod error;
 pub mod git_backup;
 pub mod git_fetcher;
@@ -25,6 +26,7 @@ pub mod version_store;
 
 // Re-export commonly used types
 pub use dedup::DedupResult;
+pub use diff::{compute_diff, DiffHunk, DiffLine, DiffLineKind};
 pub use error::{AppError, ErrorKind};
 pub use pack_seeder::SeedResult;
 pub use skill_store::{

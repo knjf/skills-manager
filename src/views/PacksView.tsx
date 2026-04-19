@@ -10,11 +10,15 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { RouterEditor } from "../components/RouterEditor";
 import * as api from "../lib/tauri";
-import type { PackRecord, SkillRecord, ManagedSkill } from "../lib/tauri";
+import type { PackRecord, PackSkillRecord, ManagedSkill } from "../lib/tauri";
+
+type SkillRecord = PackSkillRecord;
 import {
   PACK_ICON_OPTIONS,
   PACK_COLOR_OPTIONS,
@@ -352,9 +356,10 @@ interface PackDetailProps {
   onEdit: (pack: PackRecord) => void;
   onDelete: (pack: PackRecord) => void;
   onRefresh: () => void;
+  onPackChanged: (pack: PackRecord) => void;
 }
 
-function PackDetail({ pack, onBack, onEdit, onDelete, onRefresh }: PackDetailProps) {
+function PackDetail({ pack, onBack, onEdit, onDelete, onRefresh, onPackChanged }: PackDetailProps) {
   const { managedSkills } = useApp();
   const [skills, setSkills] = useState<SkillRecord[]>([]);
   const [showAddSkills, setShowAddSkills] = useState(false);
@@ -514,6 +519,88 @@ function PackDetail({ pack, onBack, onEdit, onDelete, onRefresh }: PackDetailPro
         </div>
       )}
 
+      {/* Progressive Disclosure */}
+      <section className="mt-6 border-t border-border-subtle pt-4">
+        <h3 className="text-[13px] font-semibold text-primary mb-3">Progressive Disclosure</h3>
+
+        <label className="inline-flex items-center gap-2 mb-4 text-[12px] text-secondary">
+          <input
+            type="checkbox"
+            checked={pack.is_essential}
+            onChange={async (e) => {
+              try {
+                await invoke("set_pack_essential", {
+                  packId: pack.id,
+                  isEssential: e.target.checked,
+                });
+                const updated = await api.getPackById(pack.id);
+                if (updated) onPackChanged(updated);
+                onRefresh();
+                toast.success(e.target.checked ? "Marked as essential" : "Unmarked essential");
+              } catch {
+                toast.error("Failed to update essential flag");
+              }
+            }}
+          />
+          <span>Mark as Essential (always full-sync)</span>
+        </label>
+
+        {!pack.is_essential && (
+          <>
+            <RouterEditor
+              packId={pack.id}
+              initial={{
+                description: pack.router_description ?? "",
+                body: pack.router_body,
+              }}
+              onSave={async ({ description, body }) => {
+                try {
+                  await invoke("set_pack_router", {
+                    packId: pack.id,
+                    description,
+                    body,
+                  });
+                  const updated = await api.getPackById(pack.id);
+                  if (updated) onPackChanged(updated);
+                  onRefresh();
+                  toast.success("Router saved");
+                } catch {
+                  toast.error("Failed to save router");
+                }
+              }}
+              onGenerate={async () => {
+                try {
+                  await invoke("write_pending_router_marker", { packId: pack.id });
+                  window.alert(
+                    "Generation queued. Open Claude Code — the pack-router-gen skill will handle this pack. Refresh when done."
+                  );
+                } catch {
+                  toast.error("Failed to queue generation");
+                }
+              }}
+              onPreview={async () => {
+                try {
+                  const md = await invoke<string>("preview_router_skill_md", {
+                    packId: pack.id,
+                  });
+                  window.alert(
+                    md.length > 2000 ? md.slice(0, 2000) + "\n...[truncated]" : md
+                  );
+                } catch {
+                  toast.error("Failed to preview");
+                }
+              }}
+            />
+
+            <div className="text-[11px] text-faint mt-2">
+              {pack.router_updated_at
+                ? `Last generated: ${new Date(pack.router_updated_at * 1000).toLocaleString()}`
+                : "Router not generated yet"}
+            </div>
+          </>
+        )}
+      </section>
+
       <AddSkillsDialog
         open={showAddSkills}
         pack={pack}
@@ -618,6 +705,7 @@ export function PacksView() {
           onEdit={(p) => setEditTarget(p)}
           onDelete={(p) => setDeleteTarget(p)}
           onRefresh={loadPacks}
+          onPackChanged={(p) => setSelectedPack(p)}
         />
 
         <PackDialog
@@ -720,6 +808,24 @@ export function PacksView() {
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-[11px] text-faint">
                       {skillCount} skill{skillCount !== 1 ? "s" : ""}
+                    </span>
+                    <span
+                      className="text-[11px]"
+                      title={
+                        pack.is_essential
+                          ? "Essential — always full-sync"
+                          : pack.router_description
+                            ? "Has router"
+                            : "No router"
+                      }
+                    >
+                      {pack.is_essential ? (
+                        <span className="text-blue-500">●</span>
+                      ) : pack.router_description ? (
+                        <span className="text-green-500">✓</span>
+                      ) : (
+                        <span className="text-yellow-500">⚠</span>
+                      )}
                     </span>
                   </div>
                 </div>

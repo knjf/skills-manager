@@ -302,6 +302,216 @@ fn resync_if_active(store: &SkillStore, scenario_id: &str) -> Result<()> {
     Ok(())
 }
 
+// ── Pack context / router commands ───────────────────────
+
+pub fn cmd_pack_context(name: &str) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let skills = store.get_skills_for_pack(&pack.id)?;
+
+    println!("# Pack: {}\n", pack.name);
+    if let Some(d) = &pack.description {
+        println!("Description: {d}\n");
+    }
+    if let Some(r) = &pack.router_description {
+        println!("Current router: {r}\n");
+    }
+    println!("## Skills ({})\n", skills.len());
+    for s in &skills {
+        println!(
+            "- {}: {}",
+            s.name,
+            s.description.clone().unwrap_or_default()
+        );
+    }
+    Ok(())
+}
+
+pub fn cmd_pack_set_router(
+    name: &str,
+    description: Option<&str>,
+    body_file: Option<&std::path::Path>,
+) -> Result<()> {
+    if description.is_none() && body_file.is_none() {
+        anyhow::bail!("set-router requires at least one of --description or --body");
+    }
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let body = body_file.map(std::fs::read_to_string).transpose()?;
+    let ts = chrono::Utc::now().timestamp();
+    store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+    println!("Router updated for pack '{}'.", pack.name);
+    Ok(())
+}
+
+pub fn cmd_pack_list_routers() -> Result<()> {
+    let store = open_store()?;
+    for pack in store.get_all_packs()? {
+        let status = if pack.router_description.is_some() {
+            "✓"
+        } else {
+            "—"
+        };
+        println!(
+            "{status}  {name:<24} {desc}",
+            status = status,
+            name = pack.name,
+            desc = pack
+                .router_description
+                .as_deref()
+                .unwrap_or("<not generated>"),
+        );
+    }
+    Ok(())
+}
+
+pub fn cmd_pack_gen_router(name: &str) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let skills = store
+        .get_skills_for_pack(&pack.id)?
+        .into_iter()
+        .map(|s| (s.name, s.description))
+        .collect();
+    let marker = skills_manager_core::pending_router_gen::PendingMarker {
+        pack_id: pack.id.clone(),
+        pack_name: pack.name.clone(),
+        created_at: chrono::Utc::now().timestamp(),
+        skills,
+    };
+    let sm_root = central_repo::base_dir();
+    skills_manager_core::pending_router_gen::write_marker(&sm_root, &marker)?;
+    println!(
+        "Pending marker written. Open Claude Code — the pack-router-gen skill will handle '{}'.",
+        pack.name
+    );
+    Ok(())
+}
+
+pub fn cmd_pack_regen_all_routers() -> Result<()> {
+    let store = open_store()?;
+    for pack in store.get_all_packs()? {
+        if pack.is_essential {
+            continue;
+        }
+        cmd_pack_gen_router(&pack.name)?;
+    }
+    Ok(())
+}
+
+// ── Router eval harness (MVP, string-match proxy) ────────
+
+/// Canned queries per pack. A "hit" means the pack's `router_description`
+/// contains at least one meaningful (>3 char) word from the query.
+///
+/// This is a cheap regression guard — not a substitute for a live Claude
+/// routing eval, which is out of scope for MVP.
+const EVAL_QUERIES: &[(&str, &[&str])] = &[
+    (
+        "mkt-seo",
+        &["audit my SEO", "add schema markup", "not ranking on Google"],
+    ),
+    (
+        "dev-frontend",
+        &[
+            "build a landing page",
+            "tailwind component",
+            "stitch mockup",
+        ],
+    ),
+    (
+        "web-research",
+        &["deep research", "search twitter", "last 30 days trends"],
+    ),
+    (
+        "browser-automation",
+        &["scrape this page", "browser automation", "login to site"],
+    ),
+    ("mkt-copy", &["write cold email", "ad copy", "sales deck"]),
+    (
+        "mkt-cro",
+        &[
+            "landing page conversion",
+            "signup optimization",
+            "popup for leads",
+        ],
+    ),
+    (
+        "knowledge-library",
+        &["readwise highlights", "obsidian note", "feed catchup"],
+    ),
+    (
+        "docs-office",
+        &["convert to pdf", "word document", "pptx slides"],
+    ),
+    (
+        "ai-engineering",
+        &["build mcp server", "claude api tool use", "prompt caching"],
+    ),
+    (
+        "agent-orchestration",
+        &["paseo committee", "loop agent", "handoff to another"],
+    ),
+];
+
+pub fn cmd_pack_eval_routers() -> Result<()> {
+    let store = open_store()?;
+
+    let mut total_hits = 0usize;
+    let mut total_queries = 0usize;
+
+    println!("{:<22} {:>8} {:>8}", "Pack", "Hits", "Total");
+    println!("{}", "-".repeat(42));
+
+    for (pack_name, queries) in EVAL_QUERIES {
+        let pack = match store
+            .get_all_packs()?
+            .into_iter()
+            .find(|p| p.name.eq_ignore_ascii_case(pack_name))
+        {
+            Some(p) => p,
+            None => continue,
+        };
+
+        let desc = pack
+            .router_description
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+
+        let mut hits = 0usize;
+        for q in *queries {
+            let q_lower = q.to_lowercase();
+            // Hit = at least one meaningful word (>3 chars) from the query
+            // appears in the router description.
+            if q_lower
+                .split_whitespace()
+                .any(|w| w.len() > 3 && desc.contains(w))
+            {
+                hits += 1;
+            }
+        }
+
+        let total = queries.len();
+        total_hits += hits;
+        total_queries += total;
+        println!("{:<22} {:>8} {:>8}", pack_name, hits, total);
+    }
+
+    println!("{}", "-".repeat(42));
+    let pct = if total_queries > 0 {
+        (total_hits * 100) / total_queries
+    } else {
+        0
+    };
+    println!(
+        "{:<22} {:>8} {:>8}   ({}%)",
+        "TOTAL", total_hits, total_queries, pct
+    );
+
+    Ok(())
+}
+
 // ── Pack helper ──
 
 fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_core::PackRecord> {

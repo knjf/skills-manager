@@ -6,7 +6,7 @@ use tauri::State;
 use crate::core::{
     error::AppError,
     plugins,
-    skill_store::{ScenarioRecord, SkillStore},
+    skill_store::{DisclosureMode, ScenarioRecord, SkillStore},
     sync_engine, tool_adapters,
 };
 use std::collections::HashSet;
@@ -62,6 +62,7 @@ pub struct ScenarioDto {
     pub skill_count: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    pub disclosure_mode: String,
 }
 
 #[tauri::command]
@@ -83,6 +84,7 @@ pub async fn get_scenarios(
                 skill_count: count,
                 created_at: s.created_at,
                 updated_at: s.updated_at,
+                disclosure_mode: s.disclosure_mode.as_str().to_string(),
             });
         }
         Ok(result)
@@ -111,6 +113,7 @@ pub async fn get_active_scenario(
                     skill_count: count,
                     created_at: s.created_at,
                     updated_at: s.updated_at,
+                    disclosure_mode: s.disclosure_mode.as_str().to_string(),
                 }));
             }
         }
@@ -141,6 +144,7 @@ pub async fn create_scenario(
             sort_order: 999,
             created_at: now,
             updated_at: now,
+            disclosure_mode: DisclosureMode::Full,
         };
 
         store.insert_scenario(&record).map_err(AppError::db)?;
@@ -167,6 +171,7 @@ pub async fn create_scenario(
             skill_count: 0,
             created_at: now,
             updated_at: now,
+            disclosure_mode: DisclosureMode::Full.as_str().to_string(),
         })
     })
     .await?;
@@ -569,4 +574,19 @@ pub(crate) fn unsync_scenario_skills(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn set_scenario_disclosure_mode(
+    scenario_id: String,
+    mode: String,
+    store: State<'_, Arc<SkillStore>>,
+) -> Result<(), AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store
+            .set_scenario_disclosure_mode(&scenario_id, &mode)
+            .map_err(AppError::db)
+    })
+    .await?
 }

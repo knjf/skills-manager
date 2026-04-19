@@ -95,8 +95,8 @@ export function PluginsView() {
       const plugin = plugins.find((p) => p.id === pluginId);
       toast.success(
         enabled
-          ? `${plugin?.name || "Plugin"} enabled`
-          : `${plugin?.name || "Plugin"} disabled`,
+          ? `${plugin?.display_name || "Plugin"} enabled`
+          : `${plugin?.display_name || "Plugin"} disabled`,
       );
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to toggle plugin"));

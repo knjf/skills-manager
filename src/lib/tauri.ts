@@ -79,6 +79,7 @@ export interface Scenario {
   skill_count: number;
   created_at: number;
   updated_at: number;
+  disclosure_mode: "full" | "hybrid" | "router_only";
 }
 
 export interface DiscoveredGroup {
@@ -529,6 +530,10 @@ export interface PackRecord {
   sort_order: number;
   created_at: number;
   updated_at: number;
+  router_description: string | null;
+  router_body: string | null;
+  is_essential: boolean;
+  router_updated_at: number | null;
 }
 
 /** Lightweight skill record returned by pack queries (not the full ManagedSkill). */

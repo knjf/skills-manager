@@ -9,7 +9,6 @@ import {
   Check,
   X,
   ToggleLeft,
-  ToggleRight,
   FileText,
   Info,
   ExternalLink,
@@ -33,9 +32,48 @@ interface SkillGroup {
   name: string;
   icon: "pack" | "ungrouped";
   skills: PackSkillRecord[];
+  isEssential: boolean;
 }
 
 const UNGROUPED_ID = "__ungrouped__";
+
+// ── Cell classification ──
+
+type CellKind = "materialized" | "via_router" | "none";
+
+function classifyCell(
+  inScope: boolean,
+  isEssentialPack: boolean,
+  mode: "full" | "hybrid" | "router_only",
+): CellKind {
+  if (!inScope) return "none";
+  if (mode === "full") return "materialized";
+  if (mode === "hybrid") {
+    return isEssentialPack ? "materialized" : "via_router";
+  }
+  return "via_router";
+}
+
+const kindDisplay: Record<
+  CellKind,
+  { symbol: string; className: string; title: string }
+> = {
+  materialized: {
+    symbol: "●",
+    className: "text-green-700 dark:text-green-500",
+    title: "Materialized in agent dir",
+  },
+  via_router: {
+    symbol: "◐",
+    className: "text-blue-600 dark:text-blue-400",
+    title: "Accessible via pack router",
+  },
+  none: {
+    symbol: "○",
+    className: "text-gray-300 dark:text-gray-600",
+    title: "Not in scope",
+  },
+};
 
 // ── Component ──
 
@@ -128,6 +166,7 @@ export function MatrixView() {
           name: pack.name,
           icon: "pack",
           skills: effectivePackSkills,
+          isEssential: pack.is_essential ?? false,
         });
       }
 
@@ -143,6 +182,7 @@ export function MatrixView() {
           name: "Ungrouped",
           icon: "ungrouped",
           skills: ungroupedSkills,
+          isEssential: false,
         });
       }
 
@@ -405,18 +445,34 @@ export function MatrixView() {
     );
   };
 
-  const renderSkillToolCell = (skill: PackSkillRecord, tool: ToolInfo) => {
+  const disclosureMode = activeScenario?.disclosure_mode ?? "full";
+
+  const renderSkillToolCell = (
+    skill: PackSkillRecord,
+    tool: ToolInfo,
+    isEssentialPack: boolean,
+  ) => {
     const toggles = skillToggles[skill.id];
     const toggle = toggles?.find((t) => t.tool === tool.key);
     const enabled = toggle?.enabled ?? false;
     const cellKey = `${skill.id}-${tool.key}`;
     const isToggling = togglingCell === cellKey;
 
+    const inScope = !!toggle && enabled;
+    const kind = classifyCell(inScope, isEssentialPack, disclosureMode);
+    const display = kindDisplay[kind];
+
     if (!toggle) {
       return (
         <td key={tool.key} className="px-2 py-1.5 text-center">
-          <span className="inline-flex h-6 w-6 items-center justify-center text-faint">
-            <span className="h-1.5 w-1.5 rounded-full bg-border-subtle" />
+          <span
+            className={cn(
+              "inline-flex h-6 w-6 items-center justify-center text-base leading-none",
+              display.className,
+            )}
+            title={display.title}
+          >
+            {display.symbol}
           </span>
         </td>
       );
@@ -428,24 +484,16 @@ export function MatrixView() {
           onClick={() => handleToggleSkillTool(skill.id, tool.key, !enabled)}
           disabled={isToggling || !activeScenario}
           className={cn(
-            "inline-flex h-6 w-6 items-center justify-center rounded transition-colors",
-            enabled
-              ? "text-emerald-500 hover:bg-emerald-500/10"
-              : "text-faint hover:bg-surface-hover hover:text-muted",
+            "inline-flex h-6 w-6 items-center justify-center rounded text-base leading-none transition-colors hover:bg-surface-hover",
+            display.className,
             isToggling && "opacity-50",
           )}
-          title={
-            enabled
-              ? `${skill.name} enabled for ${tool.display_name}`
-              : `${skill.name} disabled for ${tool.display_name}`
-          }
+          title={`${skill.name}: ${display.title} — click to toggle for ${tool.display_name}`}
         >
           {isToggling ? (
             <Loader2 className="h-3 w-3 animate-spin" />
-          ) : enabled ? (
-            <ToggleRight className="h-3.5 w-3.5" />
           ) : (
-            <ToggleLeft className="h-3.5 w-3.5" />
+            <span>{display.symbol}</span>
           )}
         </button>
       </td>
@@ -580,6 +628,27 @@ export function MatrixView() {
         </div>
       )}
 
+      <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="text-green-700 dark:text-green-500 text-base leading-none">
+            ●
+          </span>
+          Materialized
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-blue-600 dark:text-blue-400 text-base leading-none">
+            ◐
+          </span>
+          Via router
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-gray-300 dark:text-gray-600 text-base leading-none">
+            ○
+          </span>
+          Not in scope
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-border-subtle bg-surface">
         <table className="w-full text-sm">
           <thead>
@@ -644,6 +713,7 @@ interface GroupRowsProps {
   renderSkillToolCell: (
     skill: PackSkillRecord,
     tool: ToolInfo,
+    isEssentialPack: boolean,
   ) => React.ReactNode;
 }
 
@@ -711,7 +781,9 @@ function GroupRows({
                 {skill.name}
               </span>
             </td>
-            {columns.map((tool) => renderSkillToolCell(skill, tool))}
+            {columns.map((tool) =>
+              renderSkillToolCell(skill, tool, group.isEssential),
+            )}
           </tr>
         ))}
     </>

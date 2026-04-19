@@ -1,3 +1,4 @@
+pub mod builtin_skills;
 pub mod central_repo;
 pub mod content_hash;
 pub mod crypto;
@@ -9,8 +10,10 @@ pub mod install_cancel;
 pub mod installer;
 pub mod migrations;
 pub mod pack_seeder;
+pub mod pending_router_gen;
 pub mod plugins;
 pub mod project_scanner;
+pub mod router_render;
 pub mod scanner;
 pub mod skill_metadata;
 pub mod skill_store;
@@ -24,8 +27,8 @@ pub use dedup::DedupResult;
 pub use error::{AppError, ErrorKind};
 pub use pack_seeder::SeedResult;
 pub use skill_store::{
-    AgentConfigRecord, AgentSkillOwnership, DiscoveredSkillRecord, ManagedPluginRecord, PackRecord,
-    ProjectRecord, ScenarioPluginRecord, ScenarioRecord, ScenarioSkillToolToggleRecord,
-    SkillRecord, SkillStore, SkillTargetRecord,
+    AgentConfigRecord, AgentSkillOwnership, DisclosureMode, DiscoveredSkillRecord,
+    ManagedPluginRecord, PackRecord, ProjectRecord, ScenarioPluginRecord, ScenarioRecord,
+    ScenarioSkillToolToggleRecord, SkillRecord, SkillStore, SkillTargetRecord,
 };
 pub use sync_engine::SyncMode;

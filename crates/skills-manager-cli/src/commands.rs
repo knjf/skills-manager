@@ -302,6 +302,31 @@ fn resync_if_active(store: &SkillStore, scenario_id: &str) -> Result<()> {
     Ok(())
 }
 
+// ── Pack context / router commands ───────────────────────
+
+pub fn cmd_pack_context(name: &str) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let skills = store.get_skills_for_pack(&pack.id)?;
+
+    println!("# Pack: {}\n", pack.name);
+    if let Some(d) = &pack.description {
+        println!("Description: {d}\n");
+    }
+    if let Some(r) = &pack.router_description {
+        println!("Current router: {r}\n");
+    }
+    println!("## Skills ({})\n", skills.len());
+    for s in &skills {
+        println!(
+            "- {}: {}",
+            s.name,
+            s.description.clone().unwrap_or_default()
+        );
+    }
+    Ok(())
+}
+
 // ── Pack helper ──
 
 fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_core::PackRecord> {

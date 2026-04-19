@@ -108,6 +108,11 @@ enum PackAction {
         /// Scenario name
         scenario: String,
     },
+    /// Show pack details (description, router, skills)
+    Context {
+        /// Pack name
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -146,6 +151,7 @@ fn main() {
         Commands::Pack { action } => match action {
             PackAction::Add { pack, scenario } => commands::cmd_pack_add(&pack, &scenario),
             PackAction::Remove { pack, scenario } => commands::cmd_pack_remove(&pack, &scenario),
+            PackAction::Context { name } => commands::cmd_pack_context(&name),
         },
         Commands::Agents => commands::cmd_agents(),
         Commands::Agent { action } => match action {

@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Current schema version. Bump this when adding a new migration.
-const LATEST_VERSION: u32 = 8;
+const LATEST_VERSION: u32 = 9;
 
 const PLUGINS_SCHEMA_DDL: &str = "
     CREATE TABLE IF NOT EXISTS managed_plugins (
@@ -115,6 +115,7 @@ fn migrate_step(conn: &Connection, from_version: u32) -> Result<()> {
         5 => migrate_v5_to_v6(conn),
         6 => migrate_v6_to_v7(conn),
         7 => migrate_v7_to_v8(conn),
+        8 => migrate_v8_to_v9(conn),
         _ => bail!("unknown migration version: {from_version}"),
     }
 }
@@ -347,6 +348,40 @@ fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
             "INTEGER NOT NULL DEFAULT 0",
         )?;
     }
+    Ok(())
+}
+
+/// v8 → v9: Progressive Disclosure columns on packs + scenarios.
+///
+/// Guarded with `table_exists` + `add_column_if_missing` so that tests which
+/// start at an intermediate version with a partial schema (see
+/// `v5_to_v6_migration_adds_plugin_tables`) still migrate cleanly.
+fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
+    if table_exists(conn, "packs")? {
+        add_column_if_missing(conn, "packs", "router_description", "TEXT")
+            .context("v8→v9: add packs.router_description")?;
+        add_column_if_missing(conn, "packs", "router_body", "TEXT")
+            .context("v8→v9: add packs.router_body")?;
+        add_column_if_missing(conn, "packs", "is_essential", "INTEGER NOT NULL DEFAULT 0")
+            .context("v8→v9: add packs.is_essential")?;
+        add_column_if_missing(conn, "packs", "router_updated_at", "INTEGER")
+            .context("v8→v9: add packs.router_updated_at")?;
+    }
+
+    if table_exists(conn, "scenarios")? {
+        add_column_if_missing(
+            conn,
+            "scenarios",
+            "disclosure_mode",
+            "TEXT NOT NULL DEFAULT 'full'",
+        )
+        .context("v8→v9: add scenarios.disclosure_mode")?;
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_scenarios_mode ON scenarios(disclosure_mode);",
+        )
+        .context("v8→v9: create idx_scenarios_mode")?;
+    }
+
     Ok(())
 }
 
@@ -979,5 +1014,53 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         assert_eq!(version, LATEST_VERSION);
+    }
+
+    #[test]
+    fn v8_to_v9_migration_adds_router_and_disclosure_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+
+        // Fresh DB path runs all migrations through latest.
+        run_migrations(&conn).unwrap();
+
+        // Assert new pack columns
+        let pack_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(packs)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+        assert!(pack_cols.contains(&"router_description".to_string()));
+        assert!(pack_cols.contains(&"router_body".to_string()));
+        assert!(pack_cols.contains(&"is_essential".to_string()));
+        assert!(pack_cols.contains(&"router_updated_at".to_string()));
+
+        // Assert scenario column
+        let scenario_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(scenarios)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+        assert!(scenario_cols.contains(&"disclosure_mode".to_string()));
+
+        // Assert index exists
+        let idx: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_scenarios_mode'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(idx, 1);
+
+        // Version bumped to 9
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 9);
     }
 }

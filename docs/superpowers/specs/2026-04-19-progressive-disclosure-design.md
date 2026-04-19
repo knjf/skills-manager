@@ -132,7 +132,7 @@ Existing scenarios keep their IDs and names; `scenario_packs` rows are restructu
 |---|---|---|
 | `minimal` | `full` | essential |
 | `core` | `hybrid` | essential + route-gstack |
-| `standard` | `hybrid` | essential + route-gstack + route-superpowers + dev-frontend + browser-automation + web-research + knowledge-library |
+| `standard` | `hybrid` | essential + route-gstack + dev-frontend + browser-automation + web-research + knowledge-library |
 | `standard-marketing` | `hybrid` | standard + mkt-strategy + mkt-copy + mkt-cro |
 | `full-dev` | `hybrid` | standard + dev-backend + ai-engineering + docs-office + agent-orchestration |
 | `full-dev-marketing` | `hybrid` | full-dev + all mkt-* |

@@ -3,7 +3,6 @@ use skills_manager_core::skill_store::SkillStore;
 use skills_manager_core::{
     central_repo, dedup, pack_seeder, sync_engine, tool_adapters, ScenarioRecord,
 };
-use std::path::PathBuf;
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -719,51 +718,18 @@ pub fn cmd_agent_remove_pack(agent: &str, pack_name: &str) -> Result<()> {
 /// Uses filesystem scanning to find entries pointing to ~/.skills-manager/skills/,
 /// which is reliable regardless of DB state.
 fn unsync_scenario(
-    store: &SkillStore,
-    scenario_id: &str,
+    _store: &SkillStore,
+    _scenario_id: &str,
     adapters: &[tool_adapters::ToolAdapter],
-    configured_mode: Option<&str>,
+    _configured_mode: Option<&str>,
 ) -> Result<()> {
-    let sm_skills_dir = central_repo::skills_dir();
-    let sm_skills_prefix = sm_skills_dir.to_string_lossy().to_string();
-
-    let skill_names: std::collections::HashSet<String> = store
-        .get_effective_skills_for_scenario(scenario_id)?
-        .into_iter()
-        .map(|s| s.name)
-        .collect();
-
     for adapter in adapters {
         let skills_dir = adapter.skills_dir();
         if !skills_dir.exists() {
             continue;
         }
-        let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode);
-
-        let entries = match std::fs::read_dir(&skills_dir) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-
-            if path.is_symlink() {
-                if let Ok(target) = std::fs::read_link(&path) {
-                    if target.to_string_lossy().contains(&sm_skills_prefix) {
-                        let _ = sync_engine::remove_target(&path);
-                    }
-                }
-            } else if matches!(mode, sync_engine::SyncMode::Copy) && path.is_dir() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if skill_names.contains(name) {
-                        let _ = sync_engine::remove_target(&path);
-                    }
-                }
-            }
-        }
+        sync_engine::unreconcile_agent_dir(&skills_dir)?;
     }
-
     Ok(())
 }
 

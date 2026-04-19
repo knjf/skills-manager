@@ -496,22 +496,22 @@ pub(crate) fn unsync_agent_skills(
     store: &SkillStore,
     tool_key: &str,
 ) -> Result<(), AppError> {
-    // Remove all targets for this tool
+    let adapter = match tool_adapters::find_adapter_with_store(store, tool_key) {
+        Some(a) => a,
+        None => return Ok(()),
+    };
+    let skills_dir = adapter.skills_dir();
+    if skills_dir.exists() {
+        sync_engine::unreconcile_agent_dir(&skills_dir).map_err(AppError::internal)?;
+    }
+    // Also clear stale targets table rows for this tool.
     let all_targets = store.get_all_targets().map_err(AppError::db)?;
     for target in &all_targets {
         if target.tool != tool_key {
             continue;
         }
-        let path = PathBuf::from(&target.target_path);
-        if let Err(e) = sync_engine::remove_target(&path) {
-            log::warn!("Failed to remove sync target {}: {e}", path.display());
-        }
         if let Err(e) = store.delete_target(&target.skill_id, &target.tool) {
-            log::warn!(
-                "Failed to delete target record for skill {}, tool {}: {e}",
-                target.skill_id,
-                target.tool
-            );
+            log::warn!("Failed to delete target record: {e}");
         }
     }
     Ok(())

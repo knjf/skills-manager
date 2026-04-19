@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-04-19-progressive-disclosure-design.md`
 
-**Version coordination note:** Current `LATEST_VERSION` is 8. PR #24 (Skill Version History) is open as v9. This plan assumes it merges first and targets **v10**. If it lands after: rename migration to v9 and update assertions.
+**Version note:** Current `LATEST_VERSION` is 8. This plan targets **v9**. (Earlier memory suggested a v9-Skill-Version-History PR was open; verified via `gh pr list` that no such PR is open on the repo. Migration naming reflects actual base.)
 
 ---
 
@@ -47,24 +47,24 @@
 
 ---
 
-## Phase 1 — Schema migration (v9 → v10)
+## Phase 1 — Schema migration (v8 → v9)
 
 ### Task 1: Add migration skeleton
 
 **Files:**
 - Modify: `crates/skills-manager-core/src/migrations.rs`
 
-- [ ] **Step 1: Add failing test for v10 schema**
+- [ ] **Step 1: Add failing test for v9 schema**
 
 Append to `#[cfg(test)] mod tests` in `migrations.rs`:
 
 ```rust
 #[test]
-fn v9_to_v10_migration_adds_router_and_disclosure_columns() {
+fn v8_to_v9_migration_adds_router_and_disclosure_columns() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp.path()).unwrap();
 
-    // Bootstrap through v9 first (fresh DB path runs all migrations)
+    // Fresh DB path runs all migrations through latest.
     super::run_migrations(&conn).unwrap();
 
     // Assert new pack columns
@@ -107,37 +107,36 @@ fn v9_to_v10_migration_adds_router_and_disclosure_columns() {
             Ok(s.parse().unwrap())
         })
         .unwrap();
-    assert_eq!(version, 10);
+    assert_eq!(version, 9);
 }
 ```
 
 - [ ] **Step 2: Run test to verify failure**
 
-Run: `cargo test -p skills-manager-core migrations::tests::v9_to_v10`
-Expected: FAIL (column not present / version != 10)
+Run: `cargo test -p skills-manager-core migrations::tests::v8_to_v9`
+Expected: FAIL (column not present / version != 9)
 
 - [ ] **Step 3: Bump LATEST_VERSION and add dispatch arm**
 
 Edit `migrations.rs` top:
 
 ```rust
-const LATEST_VERSION: u32 = 10;
+const LATEST_VERSION: u32 = 9;
 ```
 
 Add arm to `migrate_step`:
 
 ```rust
         8 => migrate_v8_to_v9(conn),
-        9 => migrate_v9_to_v10(conn),
 ```
 
-- [ ] **Step 4: Implement `migrate_v9_to_v10`**
+- [ ] **Step 4: Implement `migrate_v8_to_v9`**
 
 Append:
 
 ```rust
-/// v9 → v10: Progressive Disclosure columns on packs + scenarios.
-fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
+/// v8 → v9: Progressive Disclosure columns on packs + scenarios.
+fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
         ALTER TABLE packs ADD COLUMN router_description TEXT;
@@ -149,14 +148,14 @@ fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_scenarios_mode ON scenarios(disclosure_mode);
         ",
     )
-    .context("v9→v10: add progressive disclosure columns")?;
+    .context("v8→v9: add progressive disclosure columns")?;
     Ok(())
 }
 ```
 
 - [ ] **Step 5: Run test to verify pass**
 
-Run: `cargo test -p skills-manager-core migrations::tests::v9_to_v10`
+Run: `cargo test -p skills-manager-core migrations::tests::v8_to_v9`
 Expected: PASS
 
 - [ ] **Step 6: Run full test suite**
@@ -168,32 +167,31 @@ Expected: all pass; no regressions.
 
 ```bash
 git add crates/skills-manager-core/src/migrations.rs
-git commit -m "feat(core): v10 migration for progressive disclosure columns"
+git commit -m "feat(core): v9 migration for progressive disclosure columns"
 ```
 
-### Task 2: Upgrade-from-existing-v9 test
+### Task 2: Upgrade-from-existing-v8 test
 
-- [ ] **Step 1: Test existing v9 DB preserves data**
+- [ ] **Step 1: Test existing v8 DB preserves data**
 
 Add test to `migrations.rs`:
 
 ```rust
 #[test]
-fn v10_migration_preserves_existing_pack_data() {
+fn v9_migration_preserves_existing_pack_data() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp.path()).unwrap();
 
-    // Run migrations through v9 only by temporarily pinning
-    // (Use a helper that stops at a given version; or simulate v9 state directly)
-    super::migrate_step(&conn, 0).unwrap(); // v0→v1 ... continue until v9
-    for v in 1..9 { super::migrate_step(&conn, v).unwrap(); }
+    // Bring up to v8 then insert fixture data
+    super::migrate_step(&conn, 0).unwrap();
+    for v in 1..8 { super::migrate_step(&conn, v).unwrap(); }
 
     conn.execute(
         "INSERT INTO packs (id, name, description) VALUES ('p1', 'test-pack', 'desc')",
         [],
     ).unwrap();
 
-    super::migrate_step(&conn, 9).unwrap();
+    super::migrate_step(&conn, 8).unwrap();
 
     let (name, is_essential, router_desc): (String, i64, Option<String>) = conn
         .query_row(
@@ -210,14 +208,14 @@ fn v10_migration_preserves_existing_pack_data() {
 
 - [ ] **Step 2: Run + verify pass**
 
-Run: `cargo test -p skills-manager-core migrations::tests::v10_migration_preserves`
+Run: `cargo test -p skills-manager-core migrations::tests::v9_migration_preserves`
 Expected: PASS
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add crates/skills-manager-core/src/migrations.rs
-git commit -m "test(core): verify v10 migration preserves existing pack data"
+git commit -m "test(core): verify v9 migration preserves existing pack data"
 ```
 
 ---
@@ -1131,7 +1129,7 @@ git commit -m "feat(core): ship pack-router-gen builtin skill"
 
 ## Phase 7 — Seed new pack taxonomy
 
-### Task 10: Update `pack_seeder.rs` with v10 taxonomy
+### Task 10: Update `pack_seeder.rs` with v9 taxonomy
 
 **Files:**
 - Modify: `crates/skills-manager-core/src/pack_seeder.rs`
@@ -1244,7 +1242,7 @@ Expected: PASS.
 
 ```bash
 git add crates/skills-manager-core/src/pack_seeder.rs
-git commit -m "feat(core): v10 pack taxonomy seed with disclosure modes"
+git commit -m "feat(core): v9 pack taxonomy seed with disclosure modes"
 ```
 
 ---

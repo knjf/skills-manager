@@ -443,7 +443,12 @@ pub(crate) fn sync_agent_skills(
     };
     let scenario = match store.get_scenario_by_id(&scenario_id).map_err(AppError::db)? {
         Some(s) => s,
-        None => return Ok(()),
+        None => {
+            log::warn!(
+                "scenario '{scenario_id}' referenced by agent '{tool_key}' not found in DB"
+            );
+            return Ok(());
+        }
     };
 
     let packs_with_skills = store
@@ -511,7 +516,11 @@ pub(crate) fn unsync_agent_skills(
             continue;
         }
         if let Err(e) = store.delete_target(&target.skill_id, &target.tool) {
-            log::warn!("Failed to delete target record: {e}");
+            log::warn!(
+                "Failed to delete target record for skill {}, tool {}: {e}",
+                target.skill_id,
+                target.tool
+            );
         }
     }
     Ok(())

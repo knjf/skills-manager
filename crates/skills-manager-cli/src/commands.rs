@@ -999,3 +999,32 @@ pub fn cmd_fix_orphans() -> Result<()> {
 
     Ok(())
 }
+
+// ── Scenario commands ─────────────────────────────────
+
+pub fn cmd_scenario_set_mode(name: &str, mode: &str) -> Result<()> {
+    let store = open_store()?;
+    let scenario = find_scenario_by_name(&store, name)?;
+    // Validate mode parses cleanly.
+    let _parsed = skills_manager_core::skill_store::DisclosureMode::parse(mode)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    store.set_scenario_disclosure_mode(&scenario.id, mode)?;
+    println!(
+        "Scenario '{}' disclosure mode set to '{}'.",
+        scenario.name, mode
+    );
+    Ok(())
+}
+
+pub fn cmd_pack_set_essential(name: &str, value: &str) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let essential = match value.to_lowercase().as_str() {
+        "true" | "yes" | "1" => true,
+        "false" | "no" | "0" => false,
+        other => anyhow::bail!("invalid value '{}': expected true|false", other),
+    };
+    store.set_pack_essential(&pack.id, essential)?;
+    println!("Pack '{}' is_essential set to {}.", pack.name, essential);
+    Ok(())
+}

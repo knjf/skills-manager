@@ -1565,6 +1565,21 @@ impl SkillStore {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
+    /// Returns each scenario pack paired with its full skill list.
+    /// Used by the disclosure-mode-aware sync to decide what gets materialized.
+    pub fn get_packs_with_skills_for_scenario(
+        &self,
+        scenario_id: &str,
+    ) -> Result<Vec<(PackRecord, Vec<SkillRecord>)>> {
+        let packs = self.get_packs_for_scenario(scenario_id)?;
+        let mut out = Vec::with_capacity(packs.len());
+        for pack in packs {
+            let skills = self.get_skills_for_pack(&pack.id)?;
+            out.push((pack, skills));
+        }
+        Ok(out)
+    }
+
     // ── Agent Config ──
 
     pub fn get_agent_config(&self, tool_key: &str) -> Result<Option<AgentConfigRecord>> {
@@ -2426,6 +2441,52 @@ mod pack_tests {
         assert!(ids.contains(&"s1".to_string()));
         assert!(ids.contains(&"s2".to_string()));
         assert!(ids.contains(&"s3".to_string()));
+    }
+
+    #[test]
+    fn get_packs_with_skills_for_scenario_returns_pairs() {
+        let (store, _tmp) = test_store();
+
+        store
+            .insert_pack("p-a", "pack-a", None, None, None)
+            .unwrap();
+        store
+            .insert_pack("p-b", "pack-b", None, None, None)
+            .unwrap();
+
+        insert_test_skill(&store, "s-a1", "a1");
+        insert_test_skill(&store, "s-a2", "a2");
+        insert_test_skill(&store, "s-b1", "b1");
+
+        store.add_skill_to_pack("p-a", "s-a1").unwrap();
+        store.add_skill_to_pack("p-a", "s-a2").unwrap();
+        store.add_skill_to_pack("p-b", "s-b1").unwrap();
+
+        insert_test_scenario(&store, "sc1", "sc1");
+        store.add_pack_to_scenario("sc1", "p-a").unwrap();
+        store.add_pack_to_scenario("sc1", "p-b").unwrap();
+
+        let pairs = store.get_packs_with_skills_for_scenario("sc1").unwrap();
+
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].0.name, "pack-a");
+        assert_eq!(
+            pairs[0]
+                .1
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a1", "a2"]
+        );
+        assert_eq!(pairs[1].0.name, "pack-b");
+        assert_eq!(
+            pairs[1]
+                .1
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b1"]
+        );
     }
 }
 

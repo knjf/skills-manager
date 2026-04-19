@@ -465,15 +465,20 @@ const DEFAULT_SCENARIOS: &[ScenarioDef] = &[
     },
 ];
 
-/// Seed default packs and scenarios into the database.
+/// Seed the v9 default pack taxonomy.
 ///
-/// Idempotent: if any packs already exist, returns early unless `force` is true.
-/// When `force` is true, all existing packs are deleted first. Named scenarios
-/// from the v9 taxonomy are created if missing; if a scenario with that name
-/// already exists, its disclosure_mode is updated and the v9 pack set is re-linked.
-///
-/// Missing skills (referenced by name in a pack but absent from the DB) are
-/// logged and skipped — this keeps the seeder resilient to partial imports.
+/// Behavior:
+/// - If any packs already exist and `force == false`: returns
+///   `SeedResult { skipped: true, .. }` without touching existing data. In this
+///   fast-return path, scenario `disclosure_mode` values are NOT updated.
+/// - If `force == true`: wipes all existing packs (cascades `pack_skills` and
+///   `scenario_packs`), re-inserts the v9 taxonomy, and upserts scenarios by
+///   name — creating missing ones and updating `disclosure_mode` on existing
+///   named scenarios before re-linking the v9 pack set.
+/// - User-authored scenarios with names outside the taxonomy are never touched.
+/// - Skills referenced by packs that do not exist in the DB are logged via
+///   `log::warn!` and recorded in `SeedResult.missing_skills` without aborting —
+///   this keeps the seeder resilient to partial imports.
 pub fn seed_default_packs(store: &SkillStore, force: bool) -> Result<SeedResult> {
     let existing_packs = store.get_all_packs()?;
 

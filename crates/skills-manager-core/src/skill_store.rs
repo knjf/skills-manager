@@ -1580,6 +1580,41 @@ impl SkillStore {
         Ok(out)
     }
 
+    /// Returns each pack effectively assigned to an agent (scenario packs +
+    /// agent extra packs), paired with its full skill list. Deduplicates by
+    /// pack id, preserving scenario-pack order first, then extras.
+    pub fn get_packs_with_skills_for_agent(
+        &self,
+        tool_key: &str,
+    ) -> Result<Vec<(PackRecord, Vec<SkillRecord>)>> {
+        use std::collections::HashSet;
+
+        let agent_config = self.get_agent_config(tool_key)?;
+        let scenario_id = match agent_config.and_then(|c| c.scenario_id) {
+            Some(id) => id,
+            None => return Ok(Vec::new()),
+        };
+
+        let scenario_packs = self.get_packs_for_scenario(&scenario_id)?;
+        let extra_packs = self.get_agent_extra_packs(tool_key)?;
+
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut combined: Vec<PackRecord> =
+            Vec::with_capacity(scenario_packs.len() + extra_packs.len());
+        for p in scenario_packs.into_iter().chain(extra_packs.into_iter()) {
+            if seen.insert(p.id.clone()) {
+                combined.push(p);
+            }
+        }
+
+        let mut out = Vec::with_capacity(combined.len());
+        for pack in combined {
+            let skills = self.get_skills_for_pack(&pack.id)?;
+            out.push((pack, skills));
+        }
+        Ok(out)
+    }
+
     // ── Agent Config ──
 
     pub fn get_agent_config(&self, tool_key: &str) -> Result<Option<AgentConfigRecord>> {
@@ -2487,6 +2522,54 @@ mod pack_tests {
                 .collect::<Vec<_>>(),
             vec!["b1"]
         );
+    }
+
+    #[test]
+    fn get_packs_with_skills_for_agent_includes_extra_packs_and_dedupes() {
+        let (store, _tmp) = test_store();
+
+        // Three packs (use real convenience API: insert_pack(id, name, desc, icon, color)).
+        for (id, name) in [
+            ("p-base", "base"),
+            ("p-extra", "extra"),
+            ("p-shared", "shared"),
+        ] {
+            store.insert_pack(id, name, None, None, None).unwrap();
+        }
+        // One skill per pack (real fixture both inserts and returns the record).
+        for (sid, sname) in [
+            ("sk-base", "base-skill"),
+            ("sk-extra", "extra-skill"),
+            ("sk-shared", "shared-skill"),
+        ] {
+            insert_test_skill(&store, sid, sname);
+        }
+        // Real add_skill_to_pack signature is (pack_id, skill_id) — no sort_order.
+        store.add_skill_to_pack("p-base", "sk-base").unwrap();
+        store.add_skill_to_pack("p-extra", "sk-extra").unwrap();
+        store.add_skill_to_pack("p-shared", "sk-shared").unwrap();
+
+        // Scenario contains base + shared.
+        insert_test_scenario(&store, "sc1", "sc1");
+        store.add_pack_to_scenario("sc1", "p-base").unwrap();
+        store.add_pack_to_scenario("sc1", "p-shared").unwrap();
+
+        // Agent assigned to that scenario, with extra packs (extra + shared — shared overlaps).
+        store.set_agent_scenario("claude_code", "sc1").unwrap();
+        store
+            .add_agent_extra_pack("claude_code", "p-extra")
+            .unwrap();
+        store
+            .add_agent_extra_pack("claude_code", "p-shared")
+            .unwrap();
+
+        let pairs = store
+            .get_packs_with_skills_for_agent("claude_code")
+            .unwrap();
+        let pack_names: Vec<_> = pairs.iter().map(|(p, _)| p.name.as_str()).collect();
+
+        // base + shared (from scenario), then extra (from extras). Shared appears once.
+        assert_eq!(pack_names, vec!["base", "shared", "extra"]);
     }
 }
 

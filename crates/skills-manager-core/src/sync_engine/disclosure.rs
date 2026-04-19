@@ -31,6 +31,7 @@ pub fn resolve_desired_state(
     agent_skills_dir: &Path,
     packs: &[PackWithSkills<'_>],
     mode: DisclosureMode,
+    excluded_skills: &std::collections::HashSet<String>,
 ) -> Vec<DesiredEntry> {
     let mut out = Vec::new();
     for p in packs {
@@ -41,6 +42,9 @@ pub fn resolve_desired_state(
         };
         if materialize {
             for s in p.skills {
+                if excluded_skills.contains(&s.name) {
+                    continue;
+                }
                 out.push(DesiredEntry {
                     target_path: agent_skills_dir.join(&s.name),
                     kind: EntryKind::Skill {
@@ -122,7 +126,12 @@ mod tests {
                 skills: &dom_skills,
             },
         ];
-        let out = resolve_desired_state(Path::new("/cc"), &packs, DisclosureMode::Full);
+        let out = resolve_desired_state(
+            Path::new("/cc"),
+            &packs,
+            DisclosureMode::Full,
+            &std::collections::HashSet::new(),
+        );
         let paths: Vec<_> = out.iter().map(|e| e.target_path.clone()).collect();
         assert!(paths.contains(&PathBuf::from("/cc/find-skills")));
         assert!(paths.contains(&PathBuf::from("/cc/frontend-design")));
@@ -145,7 +154,12 @@ mod tests {
                 skills: &dom_skills,
             },
         ];
-        let out = resolve_desired_state(Path::new("/cc"), &packs, DisclosureMode::Hybrid);
+        let out = resolve_desired_state(
+            Path::new("/cc"),
+            &packs,
+            DisclosureMode::Hybrid,
+            &std::collections::HashSet::new(),
+        );
         let paths: Vec<_> = out.iter().map(|e| e.target_path.clone()).collect();
         assert!(paths.contains(&PathBuf::from("/cc/find-skills")));
         assert!(!paths.contains(&PathBuf::from("/cc/frontend-design")));
@@ -169,9 +183,70 @@ mod tests {
                 skills: &dom_skills,
             },
         ];
-        let out = resolve_desired_state(Path::new("/cc"), &packs, DisclosureMode::RouterOnly);
+        let out = resolve_desired_state(
+            Path::new("/cc"),
+            &packs,
+            DisclosureMode::RouterOnly,
+            &std::collections::HashSet::new(),
+        );
         let paths: Vec<_> = out.iter().map(|e| e.target_path.clone()).collect();
         assert_eq!(paths.len(), 1);
         assert!(paths.contains(&PathBuf::from("/cc/pack-mkt-seo")));
+    }
+
+    #[test]
+    fn excluded_skills_filtered_in_full_mode() {
+        use std::collections::HashSet;
+        let p = pack("p1", false);
+        let skills = vec![skill("alpha"), skill("beta")];
+        let packs = vec![PackWithSkills {
+            pack: &p,
+            skills: &skills,
+        }];
+        let mut excluded = HashSet::new();
+        excluded.insert("beta".to_string());
+
+        let entries = resolve_desired_state(
+            std::path::Path::new("/cc"),
+            &packs,
+            DisclosureMode::Full,
+            &excluded,
+        );
+
+        let names: Vec<_> = entries
+            .iter()
+            .map(|e| e.target_path.to_string_lossy().to_string())
+            .collect();
+        assert!(names.contains(&"/cc/alpha".to_string()));
+        assert!(!names.contains(&"/cc/beta".to_string()));
+    }
+
+    #[test]
+    fn excluded_skills_does_not_affect_routers_in_hybrid() {
+        use std::collections::HashSet;
+        let p = pack("mkt", false);
+        let skills = vec![skill("alpha"), skill("beta")];
+        let packs = vec![PackWithSkills {
+            pack: &p,
+            skills: &skills,
+        }];
+        let mut excluded = HashSet::new();
+        excluded.insert("alpha".to_string());
+        excluded.insert("beta".to_string());
+
+        let entries = resolve_desired_state(
+            std::path::Path::new("/cc"),
+            &packs,
+            DisclosureMode::Hybrid,
+            &excluded,
+        );
+
+        // Pack is non-essential and we're in hybrid: skills are vault-only,
+        // so excluded set is irrelevant for skills here. But the router MUST still be emitted.
+        let paths: Vec<_> = entries
+            .iter()
+            .map(|e| e.target_path.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(paths, vec!["/cc/pack-mkt".to_string()]);
     }
 }

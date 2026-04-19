@@ -130,7 +130,13 @@ pub fn reconcile_agent_dir(
     fs::create_dir_all(agent_skills_dir)
         .with_context(|| format!("create agent skills dir {}", agent_skills_dir.display()))?;
 
-    let desired = resolve_desired_state(agent_skills_dir, packs, mode);
+    // TODO(task-4): thread excluded_skills through reconcile_agent_dir
+    let desired = resolve_desired_state(
+        agent_skills_dir,
+        packs,
+        mode,
+        &std::collections::HashSet::new(),
+    );
     let desired_paths: HashSet<_> = desired.iter().map(|e| e.target_path.clone()).collect();
     let mut report = ReconcileReport::default();
 

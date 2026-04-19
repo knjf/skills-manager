@@ -28,7 +28,7 @@ Root cause of last boot failure: DB had `user_version=9` but column missing (cor
 
 - [x] 2.1 `pnpm exec tsc -b --noEmit` clean after PluginsView fix ✓
 - [x] 2.2 1.3 didn't panic ✓
-- [ ] 2.3 Commit + push any fixes to `docs/skill-pack-taxonomy`
+- [x] 2.3 Commit + push any fixes to `docs/skill-pack-taxonomy` ✓ (b3914bc)
 
 ## Phase 3 — Merge PR #68
 

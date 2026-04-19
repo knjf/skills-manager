@@ -32,18 +32,18 @@ Root cause of last boot failure: DB had `user_version=9` but column missing (cor
 
 ## Phase 3 — Merge PR #68
 
-- [x] 3.1 Final `cargo test --workspace` + `pnpm exec tsc -b --noEmit` green
-- [x] 3.2 Update PR #68 body with smoke-test evidence + known limitations
-- [x] 3.3 `gh pr merge 68 --squash --delete-branch` (or `--merge` if squash undesired)
-- [x] 3.4 `git checkout main && git pull origin main && git log -1`
+- [x] 3.1 Final `cargo test --workspace` + `pnpm exec tsc -b --noEmit` green ✓
+- [x] 3.2 PR body updated with smoke-test evidence ✓
+- [x] 3.3 PR #68 target was upstream (xingkongliang) which had diverged with 1.14.1 release (99-commit conflict). Closed #68, opened **knjf PR #25** against knjf/main, `MERGEABLE` CLEAN. Squash-merged as `fa8b725` ✓
+- [x] 3.4 `git fetch + update-ref main -> origin/main`; local main at `fa8b725` ✓
 
 ## Phase 4 — Clean up agent worktrees + branches
 
-- [x] 4.1 List all agent worktrees (`.claude/worktrees/agent-*`)
-- [x] 4.2 `git worktree remove --force <path>` each one
-- [x] 4.3 Delete local branches: `worktree-agent-*` and `feat/pd-*`
-- [x] 4.4 `git remote prune origin`
-- [x] 4.5 Verify `git worktree list` shows only main + superconductor worktree
+- [x] 4.1 Listed 15 agent worktrees ✓
+- [x] 4.2 Force-removed with `-f -f` (claude-agent locks) — 28GB disk freed ✓
+- [x] 4.3 Deleted local branches: 5 `feat/pd-*` + 15 `worktree-agent-*` + `docs/skill-pack-taxonomy` ✓
+- [x] 4.4 `git remote prune origin` — pruned `origin/docs/skill-pack-taxonomy` ✓
+- [x] 4.5 `git worktree list` now shows only main + `feat/skill-version-history` ✓
 
 ## Phase 5 — Rebase Skill Version History onto new main (bumps DB v9→v10)
 

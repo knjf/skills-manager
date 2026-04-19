@@ -362,6 +362,41 @@ pub fn cmd_pack_list_routers() -> Result<()> {
     Ok(())
 }
 
+pub fn cmd_pack_gen_router(name: &str) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let skills = store
+        .get_skills_for_pack(&pack.id)?
+        .into_iter()
+        .map(|s| (s.name, s.description))
+        .collect();
+    let marker = skills_manager_core::pending_router_gen::PendingMarker {
+        pack_id: pack.id.clone(),
+        pack_name: pack.name.clone(),
+        created_at: chrono::Utc::now().timestamp(),
+        skills,
+    };
+    let sm_root = central_repo::base_dir();
+    std::fs::create_dir_all(&sm_root)?;
+    skills_manager_core::pending_router_gen::write_marker(&sm_root, &marker)?;
+    println!(
+        "Pending marker written. Open Claude Code — the pack-router-gen skill will handle '{}'.",
+        pack.name
+    );
+    Ok(())
+}
+
+pub fn cmd_pack_regen_all_routers() -> Result<()> {
+    let store = open_store()?;
+    for pack in store.get_all_packs()? {
+        if pack.is_essential {
+            continue;
+        }
+        cmd_pack_gen_router(&pack.name)?;
+    }
+    Ok(())
+}
+
 // ── Pack helper ──
 
 fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_core::PackRecord> {

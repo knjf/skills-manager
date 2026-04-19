@@ -436,67 +436,58 @@ pub(crate) fn sync_agent_skills(
         _ => return Ok(()),
     };
 
-    let skills = store
-        .get_effective_skills_for_agent(tool_key)
+    let agent_config = store.get_agent_config(tool_key).map_err(AppError::db)?;
+    let scenario_id = match agent_config.and_then(|c| c.scenario_id) {
+        Some(id) => id,
+        None => return Ok(()),
+    };
+    let scenario = match store.get_scenario_by_id(&scenario_id).map_err(AppError::db)? {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+
+    let packs_with_skills = store
+        .get_packs_with_skills_for_agent(tool_key)
         .map_err(AppError::db)?;
-    let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
+    let vault_root = crate::core::central_repo::skills_dir();
 
-    // Get the agent's scenario_id for per-skill tool toggle lookups
-    let agent_scenario_id = store
-        .get_agent_config(tool_key)
-        .map_err(AppError::db)?
-        .and_then(|c| c.scenario_id);
-
-    for skill in &skills {
-        let source = PathBuf::from(&skill.central_path);
-        if !source.exists() {
-            continue;
-        }
-
-        // If agent has a scenario, check per-skill tool toggles
-        if let Some(ref scenario_id) = agent_scenario_id {
+    // Build excluded set from per-skill tool toggles.
+    let mut excluded: HashSet<String> = HashSet::new();
+    for (_pack, skills) in &packs_with_skills {
+        for skill in skills {
             let adapter_keys = vec![adapter.key.clone()];
             store
-                .ensure_scenario_skill_tool_defaults(scenario_id, &skill.id, &adapter_keys)
+                .ensure_scenario_skill_tool_defaults(&scenario_id, &skill.id, &adapter_keys)
                 .map_err(AppError::db)?;
-
             let enabled = store
-                .get_enabled_tools_for_scenario_skill(scenario_id, &skill.id)
+                .get_enabled_tools_for_scenario_skill(&scenario_id, &skill.id)
                 .map_err(AppError::db)?;
             if !enabled.contains(&adapter.key) {
-                continue;
-            }
-        }
-
-        let target = adapter.skills_dir().join(&skill.name);
-        let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode.as_deref());
-        match sync_engine::sync_skill(&source, &target, mode) {
-            Ok(actual_mode) => {
-                let now = chrono::Utc::now().timestamp_millis();
-                let target_record = crate::core::skill_store::SkillTargetRecord {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    skill_id: skill.id.clone(),
-                    tool: adapter.key.clone(),
-                    target_path: target.to_string_lossy().to_string(),
-                    mode: actual_mode.as_str().to_string(),
-                    status: "ok".to_string(),
-                    synced_at: Some(now),
-                    last_error: None,
-                };
-                if let Err(e) = store.insert_target(&target_record) {
-                    log::warn!("Failed to insert sync target for skill {}: {e}", skill.id);
-                }
-            }
-            Err(e) => {
-                log::warn!(
-                    "Failed to sync skill {} to {}: {e}",
-                    skill.id,
-                    target.display()
-                );
+                excluded.insert(skill.name.clone());
             }
         }
     }
 
+    let pack_views: Vec<sync_engine::disclosure::PackWithSkills> = packs_with_skills
+        .iter()
+        .map(|(p, s)| sync_engine::disclosure::PackWithSkills { pack: p, skills: s.as_slice() })
+        .collect();
+
+    let report = sync_engine::reconcile_agent_dir(
+        &adapter.skills_dir(),
+        &pack_views,
+        scenario.disclosure_mode,
+        &vault_root,
+        &excluded,
+    )
+    .map_err(AppError::internal)?;
+
+    log::info!(
+        "Synced {} entries to {} (mode: {:?})",
+        report.added,
+        adapter.display_name,
+        scenario.disclosure_mode
+    );
     Ok(())
 }
 

@@ -56,7 +56,10 @@ fn auto_render_body(pack: &PackRecord, skills: &[SkillRecord], vault_root: &Path
 }
 
 fn escape_yaml_scalar(s: &str) -> String {
-    if s.contains('\n') || s.contains(':') || s.starts_with(['-', '?', '[', '{', '|', '>']) {
+    if s.contains('\n')
+        || s.contains(':')
+        || s.starts_with(['-', '?', '[', '{', '|', '>', '!', '@', '`', '#', '&', '*'])
+    {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("\"{escaped}\"")
     } else {

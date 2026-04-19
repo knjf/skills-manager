@@ -127,7 +127,8 @@ pub fn reconcile_agent_dir(
     use std::collections::HashSet;
     use std::fs;
 
-    fs::create_dir_all(agent_skills_dir).ok();
+    fs::create_dir_all(agent_skills_dir)
+        .with_context(|| format!("create agent skills dir {}", agent_skills_dir.display()))?;
 
     let desired = resolve_desired_state(agent_skills_dir, packs, mode);
     let desired_paths: HashSet<_> = desired.iter().map(|e| e.target_path.clone()).collect();
@@ -155,14 +156,15 @@ pub fn reconcile_agent_dir(
                     vault_root,
                 );
                 let target_dir = entry.target_path.clone();
-                fs::create_dir_all(&target_dir).ok();
+                let is_new = !target_dir.exists();
+                fs::create_dir_all(&target_dir)
+                    .with_context(|| format!("create router dir {}", target_dir.display()))?;
                 let md_path = target_dir.join("SKILL.md");
                 let needs_write = match fs::read_to_string(&md_path) {
                     Ok(existing) => existing != content,
                     Err(_) => true,
                 };
                 if needs_write {
-                    let is_new = !md_path.exists();
                     fs::write(&md_path, &content)
                         .with_context(|| format!("write router {pack_name}"))?;
                     report.rendered_routers += 1;

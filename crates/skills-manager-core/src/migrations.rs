@@ -1170,11 +1170,11 @@ mod tests {
             .unwrap();
         assert_eq!(idx, 1);
 
-        // Version bumped to 9
+        // Version matches current LATEST_VERSION after fresh migration
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 9);
+        assert_eq!(version, LATEST_VERSION);
     }
 
     #[test]

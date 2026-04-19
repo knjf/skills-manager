@@ -846,7 +846,7 @@ export function MySkills() {
                   });
                   await refreshScenarios();
                 } catch (err) {
-                  toast.error(getErrorMessage(err));
+                  toast.error(getErrorMessage(err, t("common.error")));
                 }
               }}
             />

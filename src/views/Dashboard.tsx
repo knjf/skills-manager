@@ -139,7 +139,7 @@ export function Dashboard() {
           <div className="grid grid-cols-2 gap-3">
             {agentConfigs.map((agent) => {
               const scenarioIcon = agent.scenario_id
-                ? getScenarioIconOption({ id: agent.scenario_id, name: agent.scenario_name ?? "", icon: null, description: null, sort_order: 0, skill_count: 0, created_at: 0, updated_at: 0 })
+                ? getScenarioIconOption({ name: agent.scenario_name ?? "", icon: null, description: null })
                 : null;
               const ScenarioIcon = scenarioIcon?.icon ?? null;
 

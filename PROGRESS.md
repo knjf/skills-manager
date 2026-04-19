@@ -64,10 +64,11 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
 
-### PD Sync Wiring 🔄
-**Status:** Starting (2026-04-20)
-**Discovered:** While drafting router descriptions for marketing pack, found `reconcile_agent_dir` (the disclosure-mode-aware sync) is only invoked from unit tests. Production sync path (`sync_scenario` in CLI, Tauri sync command) bypasses disclosure mode and always materializes every skill (Full mode behaviour). Setting a scenario to `hybrid` has no effect — no router files appear in `~/.claude/skills/`.
-**Goal:** Wire `reconcile_agent_dir` into both CLI (`sm switch`) and Tauri sync commands so `disclosure_mode` actually controls what gets materialized. Then validate end-to-end with a hybrid-mode scenario.
+### PD Sync Wiring ✅
+**Status:** Complete (PR pending) **Date:** 2026-04-20
+**Discovered:** While drafting router descriptions for marketing pack, found `reconcile_agent_dir` (the disclosure-mode-aware sync) was only invoked from unit tests. Production sync path (`sync_scenario` in CLI, Tauri sync command) bypassed disclosure mode and always materialized every skill (Full mode behaviour).
+**Done:** Wired `reconcile_agent_dir` + `unreconcile_agent_dir` into both CLI (`sync_scenario`, `sync_agent`, `unsync_scenario`) and Tauri (`sync_agent_skills`, `unsync_agent_skills`). Added store helpers `get_packs_with_skills_for_scenario`/`_for_agent`. Added per-skill exclusion threading through `resolve_desired_state` for tool-toggle compatibility. Added CLI `sm scenario set-mode` + `sm pack set-essential`. 4 new integration tests in `crates/skills-manager-cli/tests/pd_wiring.rs`. Total 259 tests passing.
+**Verified end-to-end:** `sm pack set-essential base true` → `sm scenario set-mode standard-marketing hybrid` → `sm switch claude_code standard-marketing` produces 17 essential skill symlinks + 7 `pack-*` router dirs in `~/.claude/skills/`. `pack-marketing/SKILL.md` correctly shows our router description + auto-rendered skill table with vault paths. Switching back to `everything` (full mode) removes all `pack-*` dirs. New Claude Code sessions immediately see the router descriptions instead of individual skill descriptions — confirmed via system reminder showing 7 `pack-*` entries during the e2e walkthrough.
 
 ### Dashboard Update ⬜
 **Status:** Planned

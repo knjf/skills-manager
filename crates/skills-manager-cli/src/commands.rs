@@ -773,37 +773,47 @@ fn sync_scenario(
     store: &SkillStore,
     scenario_id: &str,
     adapters: &[tool_adapters::ToolAdapter],
-    configured_mode: Option<&str>,
+    _configured_mode: Option<&str>,
 ) -> Result<Vec<(String, usize)>> {
-    let skills = store.get_effective_skills_for_scenario(scenario_id)?;
+    let scenario = store
+        .get_scenario_by_id(scenario_id)?
+        .with_context(|| format!("scenario '{}' not found", scenario_id))?;
+    let packs_with_skills = store.get_packs_with_skills_for_scenario(scenario_id)?;
+    let vault_root = central_repo::skills_dir();
+
     let mut results = Vec::new();
-
     for adapter in adapters {
-        let mode = sync_engine::sync_mode_for_tool(&adapter.key, configured_mode);
         let skills_dir = adapter.skills_dir();
-        let mut synced = 0;
 
-        for skill in &skills {
-            let source = PathBuf::from(&skill.central_path);
-            if !source.exists() {
-                eprintln!(
-                    "  Warning: skipping '{}' — source path does not exist: {}",
-                    skill.name,
-                    source.display()
-                );
-                continue;
-            }
-            let target_path = skills_dir.join(&skill.name);
-            match sync_engine::sync_skill(&source, &target_path, mode) {
-                Ok(_) => synced += 1,
-                Err(e) => eprintln!(
-                    "  Warning: failed to sync '{}' to {}: {}",
-                    skill.name, adapter.display_name, e
-                ),
+        // Build excluded set for this adapter from per-skill tool toggles.
+        let mut excluded: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for (_pack, skills) in &packs_with_skills {
+            for skill in skills {
+                let adapter_keys = vec![adapter.key.clone()];
+                store.ensure_scenario_skill_tool_defaults(scenario_id, &skill.id, &adapter_keys)?;
+                let enabled = store.get_enabled_tools_for_scenario_skill(scenario_id, &skill.id)?;
+                if !enabled.contains(&adapter.key) {
+                    excluded.insert(skill.name.clone());
+                }
             }
         }
 
-        results.push((adapter.display_name.clone(), synced));
+        let pack_views: Vec<sync_engine::disclosure::PackWithSkills> = packs_with_skills
+            .iter()
+            .map(|(p, s)| sync_engine::disclosure::PackWithSkills {
+                pack: p,
+                skills: s.as_slice(),
+            })
+            .collect();
+
+        let report = sync_engine::reconcile_agent_dir(
+            &skills_dir,
+            &pack_views,
+            scenario.disclosure_mode,
+            &vault_root,
+            &excluded,
+        )?;
+        results.push((adapter.display_name.clone(), report.added));
     }
 
     Ok(results)

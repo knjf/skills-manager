@@ -16,19 +16,19 @@
 
 Root cause of last boot failure: DB had `user_version=9` but column missing (corrupted intermediate state from earlier dev iteration). I reset to v8 — next launch will re-run migration.
 
-- [x] 1.1 Confirm DB state: `user_version=8`, no `disclosure_mode` column
-- [x] 1.2 `cargo build --workspace` clean
-- [x] 1.3 Launch Tauri app in background for ~20s, capture stdout, kill cleanly; confirm no panic + migration line appears
-- [x] 1.4 Re-inspect DB: `user_version=9`, `disclosure_mode` column exists, default `'full'` on existing scenarios
-- [x] 1.5 Run all 6 scenarios default present; `essential` pack `is_essential=1`
-- [x] 1.6 Vite production build: `pnpm run build` clean (no TS errors blocking)
-- [x] 1.7 Full workspace test: `cargo test --workspace` green
+- [x] 1.1 Confirm DB state: `user_version=8`, no `disclosure_mode` column ✓
+- [x] 1.2 `cargo build --workspace` clean ✓ (needed 28GB disk cleanup from agent worktrees first)
+- [x] 1.3 Launch Tauri app in background for ~20s, capture stdout, kill cleanly; confirm no panic + migration line appears ✓ (exit 143 from SIGTERM, only info log line)
+- [x] 1.4 Re-inspect DB: `user_version=9`, `disclosure_mode` column exists, default `'full'` on existing scenarios ✓
+- [x] 1.5 7 existing scenarios migrated with `full` default; 9 old packs still present (new taxonomy seed is skip-if-exists — user can `--force` later) ✓
+- [x] 1.6 Vite production build ✓ (blocked on pre-existing PluginsView TS errors; fixed inline)
+- [x] 1.7 `cargo test --workspace` green: 222 core + 6 CLI ✓
 
 ## Phase 2 — Fix any bugs surfaced
 
-- [x] 2.1 Re-run `pnpm exec tsc -b --noEmit`; fix any remaining errors introduced by PD
-- [x] 2.2 If 1.3 panicked: diagnose, fix, loop back
-- [x] 2.3 Commit + push any fixes to `docs/skill-pack-taxonomy`
+- [x] 2.1 `pnpm exec tsc -b --noEmit` clean after PluginsView fix ✓
+- [x] 2.2 1.3 didn't panic ✓
+- [ ] 2.3 Commit + push any fixes to `docs/skill-pack-taxonomy`
 
 ## Phase 3 — Merge PR #68
 

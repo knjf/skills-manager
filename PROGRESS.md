@@ -58,11 +58,16 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Status:** Merged (subsumed by Progressive Disclosure)
 **Goal:** Seed 132 skills into 9 packs (base, gstack, marketing, etc.) on first run
 
-### Progressive Disclosure ✅
+### Progressive Disclosure ✅ (partial — sync wiring incomplete)
 **PR:** (pending) **Status:** Merged 2026-04-19
 **Goal:** Reduce Claude Code system-prompt tokens ~85% via file-based pack routers + Read-on-demand.
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
+
+### PD Sync Wiring 🔄
+**Status:** Starting (2026-04-20)
+**Discovered:** While drafting router descriptions for marketing pack, found `reconcile_agent_dir` (the disclosure-mode-aware sync) is only invoked from unit tests. Production sync path (`sync_scenario` in CLI, Tauri sync command) bypasses disclosure mode and always materializes every skill (Full mode behaviour). Setting a scenario to `hybrid` has no effect — no router files appear in `~/.claude/skills/`.
+**Goal:** Wire `reconcile_agent_dir` into both CLI (`sm switch`) and Tauri sync commands so `disclosure_mode` actually controls what gets materialized. Then validate end-to-end with a hybrid-mode scenario.
 
 ### Dashboard Update ⬜
 **Status:** Planned

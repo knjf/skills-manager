@@ -163,40 +163,23 @@ Append to the tests module:
 ```rust
     #[test]
     fn get_packs_with_skills_for_agent_includes_extra_packs_and_dedupes() {
-        let store = test_store();
-        let now = 0i64;
-        // Three packs.
-        for (id, name, sort) in [("p-base", "base", 0), ("p-extra", "extra", 1), ("p-shared", "shared", 2)] {
-            store.insert_pack(&PackRecord {
-                id: id.into(),
-                name: name.into(),
-                description: None,
-                icon: None,
-                color: None,
-                sort_order: sort,
-                created_at: now,
-                updated_at: now,
-                router_description: None,
-                router_body: None,
-                is_essential: false,
-                router_updated_at: None,
-            }).unwrap();
+        let (store, _tmp) = test_store();
+
+        // Three packs (use real convenience API: insert_pack(id, name, desc, icon, color)).
+        for (id, name) in [("p-base", "base"), ("p-extra", "extra"), ("p-shared", "shared")] {
+            store.insert_pack(id, name, None, None, None).unwrap();
         }
-        // One skill per pack.
+        // One skill per pack (use real fixture which both inserts and returns the record).
         for (sid, sname) in [("sk-base", "base-skill"), ("sk-extra", "extra-skill"), ("sk-shared", "shared-skill")] {
-            store.insert_skill(&minimal_skill(sid, sname)).unwrap();
+            insert_test_skill(&store, sid, sname);
         }
-        store.add_skill_to_pack("p-base", "sk-base", 0).unwrap();
-        store.add_skill_to_pack("p-extra", "sk-extra", 0).unwrap();
-        store.add_skill_to_pack("p-shared", "sk-shared", 0).unwrap();
+        // Real add_skill_to_pack signature is (pack_id, skill_id) — no sort_order.
+        store.add_skill_to_pack("p-base", "sk-base").unwrap();
+        store.add_skill_to_pack("p-extra", "sk-extra").unwrap();
+        store.add_skill_to_pack("p-shared", "sk-shared").unwrap();
 
         // Scenario contains base + shared.
-        let scenario = ScenarioRecord {
-            id: "sc1".into(), name: "sc1".into(), description: None, icon: None,
-            sort_order: 0, created_at: now, updated_at: now,
-            disclosure_mode: DisclosureMode::Full,
-        };
-        store.insert_scenario(&scenario).unwrap();
+        insert_test_scenario(&store, "sc1", "sc1");
         store.add_pack_to_scenario("sc1", "p-base").unwrap();
         store.add_pack_to_scenario("sc1", "p-shared").unwrap();
 
@@ -209,8 +192,15 @@ Append to the tests module:
         let pack_names: Vec<_> = pairs.iter().map(|(p, _)| p.name.as_str()).collect();
 
         // base + shared (from scenario), then extra (from extras). Shared appears once.
+        // Note: scenario_packs sort_order is assigned at insertion time; base inserted first.
         assert_eq!(pack_names, vec!["base", "shared", "extra"]);
     }
+
+    // NOTE: Use the same fixture-API adaptation pattern Task 1 used for any further
+    // tests in this file: `insert_pack(id, name, None, None, None)` (5 args),
+    // `add_skill_to_pack(pack_id, skill_id)` (2 args), `insert_test_skill(&store, id, name)`,
+    // `insert_test_scenario(&store, id, name)`. Use `set_pack_essential(pack_id, true)`
+    // when an essential pack is needed (insert_pack does not take is_essential).
 ```
 
 - [ ] **Step 2: Run test to verify it fails**

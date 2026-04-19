@@ -5,7 +5,12 @@ interface Props {
   skill: SkillHistorySummary;
 }
 
-function formatTs(ts: number | null | undefined): string {
+function formatMs(ts: number | null | undefined): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString();
+}
+
+function formatSec(ts: number | null | undefined): string {
   if (!ts) return "—";
   return new Date(ts * 1000).toLocaleString();
 }
@@ -29,10 +34,10 @@ export function MetadataPanel({ skill }: Props) {
       )}
       <div className="flex gap-4 text-xs text-muted">
         <span>{t("history.metadata.versions", { count: skill.version_count })}</span>
-        <span>{t("history.metadata.imported")}: {formatTs(skill.created_at)}</span>
-        <span>{t("history.metadata.lastUpdate")}: {formatTs(skill.updated_at)}</span>
+        <span>{t("history.metadata.imported")}: {formatMs(skill.created_at)}</span>
+        <span>{t("history.metadata.lastUpdate")}: {formatMs(skill.updated_at)}</span>
         {skill.latest_captured_at && (
-          <span>{t("history.metadata.lastCapture")}: {formatTs(skill.latest_captured_at)}</span>
+          <span>{t("history.metadata.lastCapture")}: {formatSec(skill.latest_captured_at)}</span>
         )}
       </div>
       {skill.content_hash && (

@@ -188,11 +188,7 @@ pub fn reconcile_agent_dir(
             if !is_sm_managed(&p)? {
                 continue;
             }
-            if p.is_dir() {
-                fs::remove_dir_all(&p)?;
-            } else {
-                fs::remove_file(&p)?;
-            }
+            remove_target(&p)?;
             report.removed += 1;
         }
     }
@@ -760,6 +756,7 @@ mod tests {
         assert_eq!(report.added, 1);
     }
 
+    #[cfg(unix)]
     #[test]
     fn unreconcile_removes_routers_and_symlinks_but_leaves_native() {
         let tmp = tempdir().unwrap();
@@ -772,7 +769,6 @@ mod tests {
         fs::write(vault_root.join("real-skill/SKILL.md"), "x").unwrap();
 
         // 1. SM-managed symlink into vault.
-        #[cfg(unix)]
         std::os::unix::fs::symlink(vault_root.join("real-skill"), agent_dir.join("real-skill"))
             .unwrap();
 

@@ -113,6 +113,19 @@ enum PackAction {
         /// Pack name
         name: String,
     },
+    /// Set or update a pack's router description/body
+    SetRouter {
+        /// Pack name
+        name: String,
+        /// New router description (single-line summary)
+        #[arg(long)]
+        description: Option<String>,
+        /// Path to a file whose contents become the router body
+        #[arg(long)]
+        body: Option<std::path::PathBuf>,
+    },
+    /// List packs and their router status
+    ListRouters,
 }
 
 #[derive(Subcommand)]
@@ -152,6 +165,12 @@ fn main() {
             PackAction::Add { pack, scenario } => commands::cmd_pack_add(&pack, &scenario),
             PackAction::Remove { pack, scenario } => commands::cmd_pack_remove(&pack, &scenario),
             PackAction::Context { name } => commands::cmd_pack_context(&name),
+            PackAction::SetRouter {
+                name,
+                description,
+                body,
+            } => commands::cmd_pack_set_router(&name, description.as_deref(), body.as_deref()),
+            PackAction::ListRouters => commands::cmd_pack_list_routers(),
         },
         Commands::Agents => commands::cmd_agents(),
         Commands::Agent { action } => match action {

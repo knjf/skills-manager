@@ -327,6 +327,41 @@ pub fn cmd_pack_context(name: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn cmd_pack_set_router(
+    name: &str,
+    description: Option<&str>,
+    body_file: Option<&std::path::Path>,
+) -> Result<()> {
+    let store = open_store()?;
+    let pack = find_pack_by_name(&store, name)?;
+    let body = body_file.map(std::fs::read_to_string).transpose()?;
+    let ts = chrono::Utc::now().timestamp();
+    store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+    println!("Router updated for pack '{}'.", pack.name);
+    Ok(())
+}
+
+pub fn cmd_pack_list_routers() -> Result<()> {
+    let store = open_store()?;
+    for pack in store.get_all_packs()? {
+        let status = if pack.router_description.is_some() {
+            "✓"
+        } else {
+            "—"
+        };
+        println!(
+            "{status}  {name:<24} {desc}",
+            status = status,
+            name = pack.name,
+            desc = pack
+                .router_description
+                .as_deref()
+                .unwrap_or("<not generated>"),
+        );
+    }
+    Ok(())
+}
+
 // ── Pack helper ──
 
 fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_core::PackRecord> {

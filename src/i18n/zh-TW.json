@@ -12,7 +12,9 @@
     "newScenario": "新增場景",
     "projects": "專案工作區",
     "addProject": "關聯專案",
-    "settings": "設定"
+    "settings": "設定",
+    "history": "歷史",
+    "packs": "技能包"
   },
   "help": {
     "eyebrow": "操作指南",
@@ -516,5 +518,53 @@
     "deleteSkill": "刪除 Skill",
     "deleteSkillConfirm": "確定永久刪除 Skill「{{name}}」嗎？此操作不可復原。",
     "skillDeleted": "「{{name}}」已刪除"
+  },
+  "history": {
+    "tab": "歷史",
+    "searchPlaceholder": "搜尋技能…",
+    "skillsTotal": "共 {{count}} 個技能",
+    "noSkillsMatching": "冇技能匹配「{{query}}」。",
+    "selectSkill": "請揀一個技能查看歷史。",
+    "loading": "載入中…",
+    "loadingVersions": "載入版本中…",
+    "loadingDiff": "載入差異中…",
+    "noHistory": "呢個技能仲未有歷史紀錄。",
+    "oneVersionOnly": "只有一個版本 — 無得比較。",
+    "selectTwo": "揀兩個版本嚟對比。",
+    "identical": "版本完全相同。",
+    "comparing": "對比 v{{old}} → v{{new}}",
+    "diffFailed": "載入差異失敗: {{error}}",
+    "columns": {
+      "version": "版本",
+      "hash": "雜湊",
+      "captured": "捕獲時間",
+      "trigger": "觸發方式"
+    },
+    "metadata": {
+      "versions": "{{count}} 個版本",
+      "imported": "匯入",
+      "lastUpdate": "最後更新",
+      "lastCapture": "最後捕獲",
+      "hash": "雜湊",
+      "source": "來源"
+    },
+    "trigger": {
+      "scan": "掃描",
+      "import": "匯入",
+      "backfill": "回填",
+      "restore": "還原"
+    },
+    "restore": {
+      "button": "還原呢個版本",
+      "title": "還原版本 v{{version}}？",
+      "message": "呢個操作會將此版本內容寫返中央庫同重新同步現有場景到所有代理。現有歷史會保留 — 會建立一個新版本指向呢個內容。",
+      "confirm": "還原"
+    },
+    "relTime": {
+      "justNow": "啱啱",
+      "mAgo": "{{n}} 分鐘前",
+      "hAgo": "{{n}} 小時前",
+      "dAgo": "{{n}} 日前"
+    }
   }
 }

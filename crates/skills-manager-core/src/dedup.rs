@@ -236,6 +236,7 @@ pub fn import_with_dedup(store: &SkillStore, discovered_id: &str) -> Result<Impo
         last_check_error: None,
     };
     store.insert_skill(&skill_record)?;
+    installer::capture_install_version(store, &skill_id, &install_result.central_path);
     store.link_discovered_to_skill(discovered_id, &skill_id)?;
 
     Ok(ImportAction::Imported { skill_id })
@@ -274,7 +275,7 @@ pub fn import_orphan_central_skills(store: &SkillStore) -> Result<usize> {
         let meta = skill_metadata::parse_skill_md(&path);
 
         let record = crate::skill_store::SkillRecord {
-            id,
+            id: id.clone(),
             name: name.clone(),
             description: meta.description,
             source_type: "import".to_string(),
@@ -295,6 +296,7 @@ pub fn import_orphan_central_skills(store: &SkillStore) -> Result<usize> {
             last_check_error: None,
         };
         store.insert_skill(&record)?;
+        installer::capture_install_version(store, &id, &path);
         imported += 1;
     }
 

@@ -12,6 +12,8 @@
     "newScenario": "New Scenario",
     "projects": "Project Workspaces",
     "addProject": "Link Project",
+    "history": "History",
+    "packs": "Packs",
     "settings": "Settings"
   },
   "help": {
@@ -596,5 +598,53 @@
     "batchEnabled": "{{count}} skills enabled",
     "batchDisabled": "{{count}} skills disabled",
     "batchToggleFailed": "{{count}} skills failed to update"
+  },
+  "history": {
+    "tab": "History",
+    "searchPlaceholder": "Search skills…",
+    "skillsTotal": "{{count}} skills total",
+    "noSkillsMatching": "No skills match \"{{query}}\".",
+    "selectSkill": "Select a skill to view its history.",
+    "loading": "Loading…",
+    "loadingVersions": "Loading versions…",
+    "loadingDiff": "Loading diff…",
+    "noHistory": "No history recorded for this skill yet.",
+    "oneVersionOnly": "Only one version exists — nothing to compare.",
+    "selectTwo": "Select two versions to compare.",
+    "identical": "Versions are identical.",
+    "comparing": "Comparing v{{old}} → v{{new}}",
+    "diffFailed": "Failed to load diff: {{error}}",
+    "columns": {
+      "version": "Version",
+      "hash": "Hash",
+      "captured": "Captured",
+      "trigger": "Trigger"
+    },
+    "metadata": {
+      "versions": "{{count}} versions",
+      "imported": "imported",
+      "lastUpdate": "last update",
+      "lastCapture": "last capture",
+      "hash": "hash",
+      "source": "source"
+    },
+    "trigger": {
+      "scan": "scan",
+      "import": "import",
+      "backfill": "backfill",
+      "restore": "restore"
+    },
+    "restore": {
+      "button": "Restore this version",
+      "title": "Restore version v{{version}}?",
+      "message": "This will write the content of this version back to the central library and re-sync the active scenario to every agent. The existing history is preserved — a new version is created pointing at this content.",
+      "confirm": "Restore"
+    },
+    "relTime": {
+      "justNow": "just now",
+      "mAgo": "{{n}}m ago",
+      "hAgo": "{{n}}h ago",
+      "dAgo": "{{n}}d ago"
+    }
   }
 }

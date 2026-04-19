@@ -3,6 +3,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::skill_store::{DisclosureMode, ScenarioRecord, SkillStore};
+use crate::version_store::CaptureTrigger;
 
 /// Result of seeding default packs.
 #[derive(Debug, Clone, Serialize)]
@@ -532,6 +533,15 @@ pub fn seed_default_packs(store: &SkillStore, force: bool) -> Result<SeedResult>
                 Some(skill) => {
                     store.add_skill_to_pack(&pack_id, &skill.id)?;
                     total_skills_assigned += 1;
+
+                    // Best-effort: capture a version snapshot for each skill assigned to a pack.
+                    // Fires only when the pack doesn't exist yet (first seed or force reseed),
+                    // acting as an "import" baseline for skills with a readable SKILL.md.
+                    crate::installer::capture_install_version(
+                        store,
+                        &skill.id,
+                        std::path::Path::new(&skill.central_path),
+                    );
                 }
                 None => {
                     let key = (*skill_name).to_string();

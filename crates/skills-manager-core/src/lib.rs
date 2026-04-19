@@ -3,6 +3,7 @@ pub mod central_repo;
 pub mod content_hash;
 pub mod crypto;
 pub mod dedup;
+pub mod diff;
 pub mod error;
 pub mod git_backup;
 pub mod git_fetcher;
@@ -21,9 +22,11 @@ pub mod skillsmp_api;
 pub mod skillssh_api;
 pub mod sync_engine;
 pub mod tool_adapters;
+pub mod version_store;
 
 // Re-export commonly used types
 pub use dedup::DedupResult;
+pub use diff::{compute_diff, DiffHunk, DiffLine, DiffLineKind};
 pub use error::{AppError, ErrorKind};
 pub use pack_seeder::SeedResult;
 pub use skill_store::{
@@ -32,3 +35,4 @@ pub use skill_store::{
     ScenarioSkillToolToggleRecord, SkillRecord, SkillStore, SkillTargetRecord,
 };
 pub use sync_engine::SyncMode;
+pub use version_store::{CaptureTrigger, VersionContent, VersionRecord};

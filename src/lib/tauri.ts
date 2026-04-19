@@ -1,4 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
+import type {
+  DiffHunk,
+  RestoreResult,
+  SkillHistorySummary,
+  VersionContent,
+  VersionRecord,
+} from "../types/history";
 
 // ── Types ──
 
@@ -679,6 +686,23 @@ export const markSkillAsNative = (discoveredId: string) =>
 
 export const unmarkSkillAsNative = (discoveredId: string) =>
   invoke<void>("unmark_skill_as_native", { discoveredId });
+
+// ── History ──
+
+export const listSkillsWithHistory = () =>
+  invoke<SkillHistorySummary[]>("list_skills_with_history");
+
+export const listVersions = (skillId: string) =>
+  invoke<VersionRecord[]>("list_versions", { skillId });
+
+export const getVersion = (versionId: string) =>
+  invoke<VersionContent>("get_version", { versionId });
+
+export const diffVersions = (oldId: string, newId: string) =>
+  invoke<DiffHunk[]>("diff_versions", { oldId, newId });
+
+export const restoreVersion = (versionId: string) =>
+  invoke<RestoreResult>("restore_version", { versionId });
 
 // ── Plugins (Phase 3 — stubs until backend is merged) ──
 

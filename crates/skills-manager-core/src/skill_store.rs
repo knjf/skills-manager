@@ -177,6 +177,12 @@ pub struct ScenarioSkillToolToggleRecord {
 }
 
 impl SkillStore {
+    /// Crate-internal accessor so sibling modules (e.g. version_store) can
+    /// share the single Mutex<Connection> without re-opening the database.
+    pub(crate) fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap()
+    }
+
     pub fn new(db_path: &PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;

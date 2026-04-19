@@ -353,6 +353,7 @@ pub async fn import_discovered_skill(
             last_check_error: None,
         };
         store.insert_skill(&record).map_err(AppError::db)?;
+        installer::capture_install_version(&store, &skill_id, &central_path);
         store
             .link_discovered_to_skill(&discovered_id, &skill_id)
             .map_err(AppError::db)?;

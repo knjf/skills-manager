@@ -728,6 +728,11 @@ pub async fn import_project_skill_to_center(
                     "local_only",
                 )
                 .map_err(AppError::db)?;
+            installer::capture_install_version(
+                &store,
+                &existing.id,
+                Path::new(&existing.central_path),
+            );
             // Only update source_ref when the match was already by source_ref
             // path (not by hash or name). This avoids permanently rebinding
             // unrelated center skills that merely share a name or content.
@@ -774,6 +779,7 @@ pub async fn import_project_skill_to_center(
         };
 
         store.insert_skill(&skill_record).map_err(AppError::db)?;
+        installer::capture_install_version(&store, &id, &result.central_path);
 
         if let Some(scenario_id) = active.as_deref() {
             store

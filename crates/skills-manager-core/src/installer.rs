@@ -5,6 +5,8 @@ use walkdir::WalkDir;
 use crate::central_repo;
 use crate::content_hash;
 use crate::skill_metadata::{self, sanitize_skill_name};
+use crate::skill_store::SkillStore;
+use crate::version_store::CaptureTrigger;
 
 pub struct InstallResult {
     pub name: String,
@@ -237,6 +239,30 @@ fn unique_skill_dest(parent: &Path, sanitized_name: &str, source_meta_name: &str
     }
 
     parent.join(sanitized_name)
+}
+
+/// After `install_skill_dir_to_destination` succeeds and the DB row has been
+/// persisted, call this to capture a version snapshot (trigger = Import).
+///
+/// Best-effort: a failure here is logged but never propagated so it can never
+/// break the install flow.  Must be called AFTER `store.insert_skill` (or
+/// `store.update_skill`) so that `capture_version`'s skill lookup succeeds.
+pub fn capture_install_version(store: &SkillStore, skill_id: &str, destination: &Path) {
+    let skill_md_path = destination.join("SKILL.md");
+    if let Ok(content) = std::fs::read_to_string(&skill_md_path) {
+        if let Err(err) = store.capture_version(skill_id, &content, CaptureTrigger::Import) {
+            log::warn!(
+                "capture_version after install failed for {}: {err}",
+                skill_id
+            );
+        }
+    } else {
+        log::debug!(
+            "capture_version skipped for {}: SKILL.md not readable at {}",
+            skill_id,
+            skill_md_path.display()
+        );
+    }
 }
 
 fn copy_skill_dir(src: &Path, dst: &Path) -> Result<()> {

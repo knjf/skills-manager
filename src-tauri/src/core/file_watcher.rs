@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -125,6 +126,7 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
         let mut watched = HashSet::new();
         let mut last_sync = Instant::now() - WATCH_RESCAN_INTERVAL;
         let mut last_emit = Instant::now() - WATCH_EMIT_DEBOUNCE;
+        let rescan_in_flight = Arc::new(AtomicBool::new(false));
 
         loop {
             if last_sync.elapsed() >= WATCH_RESCAN_INTERVAL {
@@ -136,6 +138,22 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
                 Ok(Ok(event)) => {
                     if !should_emit(&event) || last_emit.elapsed() < WATCH_EMIT_DEBOUNCE {
                         continue;
+                    }
+                    // Coalesce overlapping rescans: if one is already running,
+                    // drop this event's rescan — the in-flight one will pick up
+                    // the new content (dedup-by-hash makes repeat scans idempotent).
+                    if rescan_in_flight
+                        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                    {
+                        let store_clone = Arc::clone(&store);
+                        let flag = Arc::clone(&rescan_in_flight);
+                        std::thread::spawn(move || {
+                            if let Err(err) = store_clone.rescan_central_library() {
+                                log::debug!("rescan_central_library after fs event failed: {err}");
+                            }
+                            flag.store(false, Ordering::Release);
+                        });
                     }
                     if let Err(err) = app.emit(APP_FS_CHANGED_EVENT, ()) {
                         log::debug!("Failed to emit app-files-changed: {err}");

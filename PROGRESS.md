@@ -64,6 +64,15 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
 
+### Pack Content Authoring ✅
+**Status:** Complete **Date:** 2026-04-21
+**Goal:** Populate L1 (`router_description` + `router_when_to_use`) and L2 (per-skill `description_router`) for all 8 non-essential packs so hybrid mode sessions surface triggerable router descriptions.
+**Done:**
+- Pilot (2026-04-21 AM): `research` pack (L1 + 10 skills L2) + `gstack` pack (L1 + 45 skills L2). Live-verified.
+- Scale-up (2026-04-21 PM): `agent-orchestration` (L1 + 7), `browser-tools` (L1 + 7), `design` (L1 + 10), `knowledge` (L1 + 6 unique), `ops` (L1 + 4). 34 skills bulk-imported via YAML.
+- **All 7 non-essential packs now have complete L1+L2 content.** Marketing pack still has partial L2 (1/4 — authored during three-tier PD spec). Base pack is essential, no router needed.
+**Verified:** Live Claude Code session surfaced all 7 pack-* routers with their L1 description + when_to_use on next sync. Router bodies use authored L2 lines with → Pick for... markers on branching clusters. Skills with no L2 fall back to first-sentence of original description.
+
 ### Three-Tier Progressive Disclosure ✅
 **Status:** Complete (PR pending) **Date:** 2026-04-20
 **Goal:** Split PD into three storage tiers so routers carry authored per-skill differentiation and Claude Code's native `when_to_use` frontmatter field is populated.

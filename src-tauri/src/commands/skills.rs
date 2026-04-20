@@ -46,6 +46,7 @@ pub struct ManagedSkillDto {
     pub targets: Vec<TargetDto>,
     pub scenario_ids: Vec<String>,
     pub tags: Vec<String>,
+    pub description_router: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1107,6 +1108,7 @@ fn managed_skill_to_dto(
         targets,
         scenario_ids,
         tags,
+        description_router: skill.description_router,
     }
 }
 
@@ -1562,6 +1564,21 @@ pub async fn set_skill_tags(
     tauri::async_runtime::spawn_blocking(move || {
         store
             .set_tags_for_skill(&skill_id, &tags)
+            .map_err(AppError::db)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn set_skill_description_router(
+    skill_id: String,
+    text: Option<String>,
+    store: State<'_, Arc<SkillStore>>,
+) -> Result<(), AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store
+            .set_skill_description_router(&skill_id, text.as_deref())
             .map_err(AppError::db)
     })
     .await?

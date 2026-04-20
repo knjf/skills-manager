@@ -444,6 +444,7 @@ pub fn run() {
             commands::skills::detach_local_skill_source,
             commands::skills::get_all_tags,
             commands::skills::set_skill_tags,
+            commands::skills::set_skill_description_router,
             commands::skills::cancel_install,
             commands::skills::batch_import_folder,
             // Sync
@@ -509,6 +510,7 @@ pub fn run() {
             commands::packs::get_effective_skills_for_scenario,
             commands::packs::seed_default_packs,
             commands::packs::set_pack_router,
+            commands::packs::set_pack_when_to_use,
             commands::packs::set_pack_essential,
             commands::packs::preview_router_skill_md,
             // Router generation markers

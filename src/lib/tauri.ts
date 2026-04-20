@@ -42,6 +42,7 @@ export interface ManagedSkill {
   targets: SkillTarget[];
   scenario_ids: string[];
   tags: string[];
+  description_router: string | null;
 }
 
 export interface SkillTarget {
@@ -539,6 +540,7 @@ export interface PackRecord {
   updated_at: number;
   router_description: string | null;
   router_body: string | null;
+  router_when_to_use: string | null;
   is_essential: boolean;
   router_updated_at: number | null;
 }
@@ -735,3 +737,12 @@ export const setScenarioPluginEnabled = (
   enabled: boolean,
 ) =>
   invoke<void>("set_scenario_plugin_enabled", { scenarioId, pluginId, enabled });
+
+export const setPackWhenToUse = (packId: string, text: string | null) =>
+  invoke<void>("set_pack_when_to_use", { packId, text });
+
+export const setSkillDescriptionRouter = (skillId: string, text: string | null) =>
+  invoke<void>("set_skill_description_router", { skillId, text });
+
+export const setScenarioDisclosureMode = (scenarioId: string, mode: "full" | "hybrid" | "router_only") =>
+  invoke<void>("set_scenario_disclosure_mode", { scenarioId, mode });

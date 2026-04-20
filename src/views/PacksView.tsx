@@ -552,13 +552,18 @@ function PackDetail({ pack, onBack, onEdit, onDelete, onRefresh, onPackChanged }
               initial={{
                 description: pack.router_description ?? "",
                 body: pack.router_body,
+                whenToUse: pack.router_when_to_use ?? null,
               }}
-              onSave={async ({ description, body }) => {
+              onSave={async ({ description, body, whenToUse }) => {
                 try {
                   await invoke("set_pack_router", {
                     packId: pack.id,
                     description,
                     body,
+                  });
+                  await invoke("set_pack_when_to_use", {
+                    packId: pack.id,
+                    text: whenToUse,
                   });
                   const updated = await api.getPackById(pack.id);
                   if (updated) onPackChanged(updated);
@@ -827,6 +832,31 @@ export function PacksView() {
                         <span className="text-yellow-500">⚠</span>
                       )}
                     </span>
+                    {!pack.is_essential && (
+                      <span
+                        className={`text-[11px] px-1.5 py-0.5 rounded ${
+                          pack.router_description && pack.router_when_to_use
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : pack.router_description || pack.router_when_to_use
+                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
+                        title={
+                          pack.router_description && pack.router_when_to_use
+                            ? "L1 complete (description + when_to_use)"
+                            : pack.router_description || pack.router_when_to_use
+                            ? "L1 partial"
+                            : "L1 not authored"
+                        }
+                      >
+                        L1{" "}
+                        {pack.router_description && pack.router_when_to_use
+                          ? "✓"
+                          : pack.router_description || pack.router_when_to_use
+                          ? "partial"
+                          : "—"}
+                      </span>
+                    )}
                   </div>
                 </div>
 

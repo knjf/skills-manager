@@ -93,6 +93,23 @@ sm list   # Re-creates everything with defaults
 sm fix-orphans
 ```
 
+## CLI ⟷ app schema drift (after Tauri upgrade)
+
+The Tauri app and `sm` CLI share the DB at `~/.skills-manager/skills-manager.db`. If you upgrade one but not the other, the older binary may fail with:
+
+> Database schema version (N) is newer than this binary supports (M). Rebuild and reinstall: ...
+
+Fix: rebuild **both** after pulling:
+
+```bash
+git pull
+cargo build -p skills-manager-cli --release
+cp target/release/sm ~/.local/bin/sm
+cargo tauri build        # or pnpm tauri:dev for dev mode
+```
+
+Rule of thumb: always rebuild the CLI together with the Tauri app.
+
 ## Related
 
 - `sm-overview` — where data lives

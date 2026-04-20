@@ -126,6 +126,31 @@ export function Sidebar() {
     if (s) toast.success(t("scenario.switched", { name: s.name }));
   };
 
+  const handleCycleDisclosureMode = async (
+    e: React.MouseEvent,
+    scenarioId: string,
+    currentMode: "full" | "hybrid" | "router_only",
+  ) => {
+    e.stopPropagation();
+    const next: Record<typeof currentMode, "full" | "hybrid" | "router_only"> = {
+      full: "hybrid",
+      hybrid: "router_only",
+      router_only: "full",
+    };
+    const nextMode = next[currentMode];
+    try {
+      await api.setScenarioDisclosureMode(scenarioId, nextMode);
+      await refreshScenarios();
+      // Re-sync if this is the active scenario so the filesystem reflects the new mode.
+      if (activeScenario?.id === scenarioId) {
+        await switchScenario(scenarioId);
+      }
+      toast.success(`Disclosure mode → ${nextMode}`);
+    } catch (err) {
+      toast.error(`Failed to set mode: ${err}`);
+    }
+  };
+
   const handleCreateScenario = async (name: string, description?: string, icon?: string) => {
     await api.createScenario(name, description, icon);
     await Promise.all([refreshScenarios(), refreshManagedSkills()]);
@@ -308,78 +333,90 @@ export function Sidebar() {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             className={cn(
-                              "group relative flex items-center rounded-[5px] transition-colors",
+                              "group relative flex flex-col rounded-[5px] transition-colors",
                               isActive ? "bg-surface-active" : "hover:bg-surface-hover"
                             )}
                           >
-                            <button
-                              onClick={() => handleSwitchScenario(scenario.id)}
-                              className={cn(
-                                "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-[7px] text-left text-[15px] leading-5 outline-none",
-                                isActive ? "font-medium text-primary" : "text-tertiary group-hover:text-secondary"
-                              )}
-                            >
-                              <span
+                            <div className="relative flex items-center">
+                              <button
+                                onClick={() => handleSwitchScenario(scenario.id)}
                                 className={cn(
-                                  "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded border",
-                                  isActive
-                                    ? `${scenarioIcon.activeClass} ${scenarioIcon.colorClass}`
-                                    : "border-border bg-surface text-muted group-hover:border-border group-hover:text-tertiary"
+                                  "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-[7px] text-left text-[15px] leading-5 outline-none",
+                                  isActive ? "font-medium text-primary" : "text-tertiary group-hover:text-secondary"
                                 )}
                               >
-                                <ScenarioIcon className="h-3 w-3" />
-                              </span>
-                              <span className="flex-1 truncate">{scenario.name}</span>
-                              {isActive && scenario.disclosure_mode && (
                                 <span
-                                  className="ml-auto px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-700"
-                                  title={`Disclosure mode: ${scenario.disclosure_mode}`}
-                                  data-testid="sidebar-disclosure-badge"
+                                  className={cn(
+                                    "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded border",
+                                    isActive
+                                      ? `${scenarioIcon.activeClass} ${scenarioIcon.colorClass}`
+                                      : "border-border bg-surface text-muted group-hover:border-border group-hover:text-tertiary"
+                                  )}
                                 >
-                                  {scenario.disclosure_mode}
+                                  <ScenarioIcon className="h-3 w-3" />
                                 </span>
-                              )}
-                              <span className="ml-auto flex h-[18px] w-[32px] shrink-0 items-center justify-end group-hover:hidden">
-                                {scenario.skill_count > 0 && (
-                                  <span
-                                    className={cn(
-                                      "min-w-[18px] rounded-full px-1.5 text-center text-[12px] font-medium leading-[18px] tabular-nums",
-                                      isActive
-                                        ? "bg-accent-bg text-accent-light"
-                                        : "bg-surface-hover text-muted"
-                                    )}
-                                  >
-                                    {scenario.skill_count}
-                                  </span>
-                                )}
-                              </span>
-                            </button>
+                                <span className="flex-1 truncate">{scenario.name}</span>
+                                <span className="ml-auto flex h-[18px] w-[32px] shrink-0 items-center justify-end group-hover:hidden">
+                                  {scenario.skill_count > 0 && (
+                                    <span
+                                      className={cn(
+                                        "min-w-[18px] rounded-full px-1.5 text-center text-[12px] font-medium leading-[18px] tabular-nums",
+                                        isActive
+                                          ? "bg-accent-bg text-accent-light"
+                                          : "bg-surface-hover text-muted"
+                                      )}
+                                    >
+                                      {scenario.skill_count}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
 
-                            <div className={cn(
-                              "absolute right-1 flex items-center rounded-[3px] invisible opacity-0 transition-opacity group-hover:visible group-hover:opacity-100",
-                              isActive ? "bg-surface-active" : "bg-surface-hover"
-                            )}>
-                              <div
-                                {...provided.dragHandleProps}
-                                className="rounded p-1 text-faint cursor-grab active:cursor-grabbing"
-                              >
-                                <GripVertical className="h-3 w-3" />
+                              <div className={cn(
+                                "absolute right-1 flex items-center rounded-[3px] invisible opacity-0 transition-opacity group-hover:visible group-hover:opacity-100",
+                                isActive ? "bg-surface-active" : "bg-surface-hover"
+                              )}>
+                                <div
+                                  {...provided.dragHandleProps}
+                                  className="rounded p-1 text-faint cursor-grab active:cursor-grabbing"
+                                >
+                                  <GripVertical className="h-3 w-3" />
+                                </div>
+                                <button
+                                  onClick={(event) => handleRenameClick(event, scenario)}
+                                  className="rounded p-1 text-faint transition hover:text-secondary"
+                                  title={t("common.rename")}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={(event) => handleDeleteClick(event, scenario)}
+                                  className="rounded p-1 text-faint transition hover:text-red-400"
+                                  title={t("common.delete")}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
                               </div>
-                              <button
-                                onClick={(event) => handleRenameClick(event, scenario)}
-                                className="rounded p-1 text-faint transition hover:text-secondary"
-                                title={t("common.rename")}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={(event) => handleDeleteClick(event, scenario)}
-                                className="rounded p-1 text-faint transition hover:text-red-400"
-                                title={t("common.delete")}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
                             </div>
+
+                            {isActive && scenario.disclosure_mode && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleCycleDisclosureMode(e, scenario.id, scenario.disclosure_mode as "full" | "hybrid" | "router_only")}
+                                className={cn(
+                                  "ml-[34px] mr-2 mb-1.5 self-start px-2 py-0.5 text-[10px] font-medium rounded transition-colors",
+                                  scenario.disclosure_mode === "hybrid"
+                                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30"
+                                    : scenario.disclosure_mode === "router_only"
+                                    ? "bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/30"
+                                    : "bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30"
+                                )}
+                                title={`Disclosure mode: ${scenario.disclosure_mode} — click to cycle (full → hybrid → router_only → full)`}
+                                data-testid="sidebar-disclosure-badge"
+                              >
+                                {scenario.disclosure_mode}
+                              </button>
+                            )}
                           </div>
                         )}
                       </Draggable>

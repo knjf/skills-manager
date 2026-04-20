@@ -192,6 +192,21 @@ pub async fn set_pack_router(
 }
 
 #[tauri::command]
+pub async fn set_pack_when_to_use(
+    pack_id: String,
+    text: Option<String>,
+    store: State<'_, Arc<SkillStore>>,
+) -> Result<(), AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store
+            .set_pack_when_to_use(&pack_id, text.as_deref())
+            .map_err(AppError::db)
+    })
+    .await?
+}
+
+#[tauri::command]
 pub async fn set_pack_essential(
     pack_id: String,
     is_essential: bool,

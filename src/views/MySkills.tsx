@@ -153,6 +153,7 @@ export function MySkills() {
   const tagInputRef = useRef<HTMLInputElement>(null);
 
   const [scenarioSkillOrder, setScenarioSkillOrder] = useState<string[]>([]);
+  const [onlyUnsetL2, setOnlyUnsetL2] = useState(false);
 
   const activeScenarioName = activeScenario?.name || t("mySkills.currentScenarioFallback");
 
@@ -202,7 +203,7 @@ export function MySkills() {
       if (filterMode === "enabled") return enabledInScenario;
       if (filterMode === "available") return !enabledInScenario;
       return true;
-    });
+    }).filter((s) => !onlyUnsetL2 || !s.description_router);
 
     // Always sort enabled skills first; within enabled group, use custom sort order
     if (activeScenario) {
@@ -221,7 +222,7 @@ export function MySkills() {
     }
 
     return result;
-  }, [skills, search, sourceFilters, tagFilters, filterMode, activeScenario, scenarioSkillOrder]);
+  }, [skills, search, sourceFilters, tagFilters, filterMode, activeScenario, scenarioSkillOrder, onlyUnsetL2]);
 
   const {
     isMultiSelect, setIsMultiSelect,
@@ -1036,6 +1037,16 @@ export function MySkills() {
             })}
           </>
         )}
+        <span className="mx-0.5 h-3 w-px bg-border-subtle" />
+        <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-surface-hover px-2.5 py-0.5 text-[12px] font-medium text-muted hover:text-secondary">
+          <input
+            type="checkbox"
+            checked={onlyUnsetL2}
+            onChange={(e) => setOnlyUnsetL2(e.target.checked)}
+            className="h-3 w-3 accent-accent"
+          />
+          No L2
+        </label>
       </div>
 
       {isMultiSelect && (
@@ -1204,6 +1215,17 @@ export function MySkills() {
                     >
                       {skill.name}
                     </h3>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded px-1.5 py-0.5 text-xs",
+                        skill.description_router
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                      )}
+                      title={skill.description_router ?? "No L2 authored"}
+                    >
+                      {skill.description_router ? "L2 ✓" : "L2 —"}
+                    </span>
                   </div>
 
                   <div className="px-3.5 pb-3">
@@ -1370,6 +1392,18 @@ export function MySkills() {
                   {skill.name}
                 </h3>
 
+                <span
+                  className={cn(
+                    "shrink-0 rounded px-1.5 py-0.5 text-xs",
+                    skill.description_router
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                  )}
+                  title={skill.description_router ?? "No L2 authored"}
+                >
+                  {skill.description_router ? "L2 ✓" : "L2 —"}
+                </span>
+
                 <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
                   {skill.description || "—"}
                 </p>
@@ -1481,6 +1515,14 @@ export function MySkills() {
         toolToggles={toolToggles}
         togglingTool={togglingToolKey}
         onToggleTool={handleToggleSkillTool}
+        sisterSkills={[]}
+        onSaveDescriptionRouter={async (skillId, text) => {
+          await api.setSkillDescriptionRouter(skillId, text);
+          await refreshManagedSkills();
+        }}
+        onSelectSibling={(skillId) => {
+          openSkillDetailById(skillId);
+        }}
       />
 
       <ConfirmDialog

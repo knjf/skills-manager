@@ -330,15 +330,34 @@ pub fn cmd_pack_set_router(
     name: &str,
     description: Option<&str>,
     body_file: Option<&std::path::Path>,
+    when_to_use: Option<&str>,
+    clear_when_to_use: bool,
 ) -> Result<()> {
-    if description.is_none() && body_file.is_none() {
-        anyhow::bail!("set-router requires at least one of --description or --body");
+    if description.is_none() && body_file.is_none() && when_to_use.is_none() && !clear_when_to_use {
+        anyhow::bail!(
+            "set-router requires at least one of --description, --body, --when-to-use, --clear-when-to-use"
+        );
+    }
+    if when_to_use.is_some() && clear_when_to_use {
+        anyhow::bail!("cannot pass both --when-to-use and --clear-when-to-use");
     }
     let store = open_store()?;
     let pack = find_pack_by_name(&store, name)?;
-    let body = body_file.map(std::fs::read_to_string).transpose()?;
     let ts = chrono::Utc::now().timestamp();
-    store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+
+    // description / body path (existing semantics)
+    if description.is_some() || body_file.is_some() {
+        let body = body_file.map(std::fs::read_to_string).transpose()?;
+        store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+    }
+
+    // when-to-use path (new)
+    if let Some(w) = when_to_use {
+        store.set_pack_when_to_use(&pack.id, Some(w))?;
+    } else if clear_when_to_use {
+        store.set_pack_when_to_use(&pack.id, None)?;
+    }
+
     println!("Router updated for pack '{}'.", pack.name);
     Ok(())
 }

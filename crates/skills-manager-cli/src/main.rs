@@ -129,6 +129,12 @@ enum PackAction {
         /// Path to a file whose contents become the router body
         #[arg(long)]
         body: Option<std::path::PathBuf>,
+        /// Trigger / when-to-use text (native Claude Code frontmatter field)
+        #[arg(long = "when-to-use")]
+        when_to_use: Option<String>,
+        /// Clear the when-to-use field (set to NULL)
+        #[arg(long = "clear-when-to-use")]
+        clear_when_to_use: bool,
     },
     /// List packs and their router status
     ListRouters,
@@ -202,7 +208,15 @@ fn main() {
                 name,
                 description,
                 body,
-            } => commands::cmd_pack_set_router(&name, description.as_deref(), body.as_deref()),
+                when_to_use,
+                clear_when_to_use,
+            } => commands::cmd_pack_set_router(
+                &name,
+                description.as_deref(),
+                body.as_deref(),
+                when_to_use.as_deref(),
+                clear_when_to_use,
+            ),
             PackAction::ListRouters => commands::cmd_pack_list_routers(),
             PackAction::GenRouter { name } => commands::cmd_pack_gen_router(&name),
             PackAction::RegenAllRouters => commands::cmd_pack_regen_all_routers(),

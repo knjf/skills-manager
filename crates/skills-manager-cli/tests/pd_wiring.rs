@@ -212,3 +212,118 @@ fn switch_from_hybrid_to_full_removes_routers() {
         "non-essential skill should now be materialized in full mode"
     );
 }
+
+#[test]
+fn pack_set_router_stores_when_to_use() {
+    let tmp = tempfile::tempdir().unwrap();
+    seed_test_state(tmp.path());
+
+    let (ok, out, err) = run_sm(
+        tmp.path(),
+        &[
+            "pack",
+            "set-router",
+            "marketing",
+            "--description",
+            "Marketing domain",
+            "--when-to-use",
+            "Trigger when user mentions SEO / CRO / PRD",
+        ],
+    );
+    assert!(ok, "set-router failed: {err}\n{out}");
+
+    // Switch to hybrid + sync to observe rendered router SKILL.md
+    run_sm(
+        tmp.path(),
+        &["scenario", "set-mode", "test-scenario", "hybrid"],
+    );
+    let (ok, _, err) = run_sm(tmp.path(), &["switch", "claude_code", "test-scenario"]);
+    assert!(ok, "switch failed: {err}");
+
+    let router_md = tmp.path().join(".claude/skills/pack-marketing/SKILL.md");
+    let content = std::fs::read_to_string(&router_md).unwrap();
+    assert!(
+        content.contains("description: Marketing domain"),
+        "got:\n{content}"
+    );
+    assert!(
+        content.contains("when_to_use: Trigger when user mentions SEO / CRO / PRD"),
+        "when_to_use missing; got:\n{content}"
+    );
+}
+
+#[test]
+fn skill_set_router_desc_shows_in_router_body() {
+    let tmp = tempfile::tempdir().unwrap();
+    seed_test_state(tmp.path());
+
+    // Set a short router line for the marketing-pack skill.
+    let (ok, _, err) = run_sm(
+        tmp.path(),
+        &[
+            "skill",
+            "set-router-desc",
+            "mkt-skill",
+            "--description",
+            "Pick for marketing work",
+        ],
+    );
+    assert!(ok, "set-router-desc failed: {err}");
+
+    // Switch hybrid + sync.
+    run_sm(
+        tmp.path(),
+        &["scenario", "set-mode", "test-scenario", "hybrid"],
+    );
+    run_sm(tmp.path(), &["switch", "claude_code", "test-scenario"]);
+
+    let router_md = tmp.path().join(".claude/skills/pack-marketing/SKILL.md");
+    let content = std::fs::read_to_string(&router_md).unwrap();
+    assert!(
+        content.contains("| `mkt-skill` | Pick for marketing work |"),
+        "row should use new router line; got:\n{content}"
+    );
+}
+
+#[test]
+fn import_router_descs_yaml_bulk_updates() {
+    let tmp = tempfile::tempdir().unwrap();
+    seed_test_state(tmp.path());
+
+    let yaml_path = tmp.path().join("l2.yaml");
+    std::fs::write(
+        &yaml_path,
+        "mkt-skill: \"bulk-set line\"\nbase-skill: \"base line\"\nnon-existent: \"ignored\"\n",
+    )
+    .unwrap();
+
+    let (ok, out, err) = run_sm(
+        tmp.path(),
+        &["skill", "import-router-descs", yaml_path.to_str().unwrap()],
+    );
+    assert!(ok, "import failed: {err}\n{out}");
+    assert!(out.contains("Updated 2 skill(s)"), "got: {out}");
+    assert!(out.contains("skipped 1"), "got: {out}");
+}
+
+#[test]
+fn rendered_router_falls_back_when_description_router_unset() {
+    let tmp = tempfile::tempdir().unwrap();
+    seed_test_state(tmp.path());
+
+    // Don't set any description_router — switch to hybrid and render.
+    run_sm(
+        tmp.path(),
+        &["scenario", "set-mode", "test-scenario", "hybrid"],
+    );
+    run_sm(tmp.path(), &["switch", "claude_code", "test-scenario"]);
+
+    let router_md = tmp.path().join(".claude/skills/pack-marketing/SKILL.md");
+    let content = std::fs::read_to_string(&router_md).unwrap();
+    // seed_test_state's mkt-skill inserts with description=None, so first-sentence
+    // fallback yields empty — the row still renders with the skill name.
+    assert!(
+        content.contains("| `mkt-skill` |"),
+        "row missing; got:\n{content}"
+    );
+}

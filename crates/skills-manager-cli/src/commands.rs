@@ -7,6 +7,11 @@ use skills_manager_core::{
 // ── Helpers ──────────────────────────────────────────────
 
 fn open_store() -> Result<SkillStore> {
+    // Ensure the central repo exists (creates dirs + installs builtin skills).
+    // Idempotent — safe to call on every CLI invocation.
+    if let Err(e) = central_repo::ensure_central_repo() {
+        eprintln!("Warning: failed to ensure central repo: {e}");
+    }
     let db_path = central_repo::db_path();
     if !db_path.exists() {
         bail!("Skills Manager DB not found at {}", db_path.display());

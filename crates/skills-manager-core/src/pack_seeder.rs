@@ -679,39 +679,79 @@ const SM_SKILL_L2: &[(&str, &str)] = &[
 /// Idempotently ensure the `sm` pack exists with L1 + L2 populated and all
 /// 8 sm-* skills associated. Safe to call on every startup.
 pub fn ensure_sm_pack(store: &SkillStore) -> Result<()> {
-    // Short-circuit if pack already exists.
+    // Fully idempotent — each step uses INSERT OR IGNORE semantics or a missing-check,
+    // so calling this on every startup is safe and cheap.
     let all_packs = store.get_all_packs()?;
-    if all_packs.iter().any(|p| p.name == "sm") {
-        return Ok(());
-    }
+    let existing = all_packs.iter().find(|p| p.name == "sm");
+    let pack_id = if let Some(pack) = existing {
+        pack.id.clone()
+    } else {
+        let pid = Uuid::new_v4().to_string();
+        store.insert_pack(
+            &pid,
+            "sm",
+            Some("Skills Manager usage reference — concepts, CLI, authoring, debug."),
+            Some("terminal"),
+            Some("#4f46e5"),
+        )?;
+        store.set_pack_essential(&pid, true)?;
 
-    let pack_id = Uuid::new_v4().to_string();
-    store.insert_pack(
-        &pack_id,
-        "sm",
-        Some("Skills Manager usage reference — concepts, CLI, authoring, debug."),
-        Some("terminal"),
-        Some("#4f46e5"),
-    )?;
-    store.set_pack_essential(&pack_id, true)?;
+        let now = chrono::Utc::now().timestamp();
+        store.set_pack_router(
+            &pid,
+            Some(SM_PACK_DESCRIPTION),
+            None, // body — use auto-rendered skill table
+            now,
+        )?;
+        store.set_pack_when_to_use(&pid, Some(SM_PACK_WHEN_TO_USE))?;
+        pid
+    };
 
-    // Set L1.
-    let now = chrono::Utc::now().timestamp();
-    store.set_pack_router(
-        &pack_id,
-        Some(SM_PACK_DESCRIPTION),
-        None, // body — use auto-rendered skill table
-        now,
-    )?;
-    store.set_pack_when_to_use(&pack_id, Some(SM_PACK_WHEN_TO_USE))?;
-
-    // Link skills + set L2 per skill.
+    // Ensure each sm-* skill has a DB record; insert if missing (pointing at
+    // the vault path where install_builtin_skills wrote the SKILL.md).
+    let vault_root = crate::central_repo::skills_dir();
     let all_skills = store.get_all_skills()?;
     for (skill_name, l2) in SM_SKILL_L2 {
-        if let Some(skill) = all_skills.iter().find(|s| s.name == *skill_name) {
-            store.add_skill_to_pack(&pack_id, &skill.id)?;
-            store.set_skill_description_router(&skill.id, Some(l2))?;
-        }
+        let skill_id = match all_skills.iter().find(|s| s.name == *skill_name) {
+            Some(s) => s.id.clone(),
+            None => {
+                let id = Uuid::new_v4().to_string();
+                let central_path = vault_root.join(skill_name).to_string_lossy().into_owned();
+                let now_ms = chrono::Utc::now().timestamp_millis();
+                store.insert_skill(&crate::skill_store::SkillRecord {
+                    id: id.clone(),
+                    name: (*skill_name).to_string(),
+                    description: None,
+                    source_type: "builtin".into(),
+                    source_ref: None,
+                    source_ref_resolved: None,
+                    source_subpath: None,
+                    source_branch: None,
+                    source_revision: None,
+                    remote_revision: None,
+                    central_path,
+                    content_hash: None,
+                    enabled: true,
+                    created_at: now_ms,
+                    updated_at: now_ms,
+                    status: "active".into(),
+                    update_status: "idle".into(),
+                    last_checked_at: None,
+                    last_check_error: None,
+                    description_router: None,
+                })?;
+                id
+            }
+        };
+        store.add_skill_to_pack(&pack_id, &skill_id)?;
+        store.set_skill_description_router(&skill_id, Some(l2))?;
+    }
+
+    // Add the sm pack to every existing scenario (idempotent — `add_pack_to_scenario`
+    // uses INSERT OR IGNORE). This makes sm-* skills available regardless of
+    // which scenario the user is on.
+    for scenario in store.get_all_scenarios()? {
+        store.add_pack_to_scenario(&scenario.id, &pack_id)?;
     }
     Ok(())
 }

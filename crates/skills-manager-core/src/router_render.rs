@@ -80,7 +80,9 @@ fn skill_row_summary(s: &SkillRecord) -> String {
 fn escape_yaml_scalar(s: &str) -> String {
     if s.contains('\n')
         || s.contains(':')
-        || s.starts_with(['-', '?', '[', '{', '|', '>', '!', '@', '`', '#', '&', '*'])
+        || s.starts_with([
+            '-', '?', '[', '{', '|', '>', '!', '@', '`', '#', '&', '*', '\'', '%', '"',
+        ])
     {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("\"{escaped}\"")

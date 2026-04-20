@@ -445,6 +445,7 @@ mod tests {
             router_body: None,
             is_essential: essential,
             router_updated_at: None,
+            router_when_to_use: None,
         }
     }
 
@@ -689,6 +690,7 @@ mod tests {
             router_body: None,
             is_essential: true,
             router_updated_at: None,
+            router_when_to_use: None,
         };
         let skills = vec![
             SkillRecord {

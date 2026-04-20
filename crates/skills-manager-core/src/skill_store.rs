@@ -75,6 +75,7 @@ pub struct PackRecord {
     pub router_body: Option<String>,
     pub is_essential: bool,
     pub router_updated_at: Option<i64>,
+    pub router_when_to_use: Option<String>,
 }
 
 /// Progressive Disclosure mode for a scenario.
@@ -1409,7 +1410,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at,
-                    router_description, router_body, is_essential, router_updated_at
+                    router_description, router_body, is_essential, router_updated_at, router_when_to_use
              FROM packs ORDER BY sort_order, created_at",
         )?;
         let rows = stmt.query_map([], map_pack_row)?;
@@ -1420,7 +1421,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at,
-                    router_description, router_body, is_essential, router_updated_at
+                    router_description, router_body, is_essential, router_updated_at, router_when_to_use
              FROM packs WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], map_pack_row)?;
@@ -1555,7 +1556,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.icon, p.color, p.sort_order, p.created_at, p.updated_at,
-                    p.router_description, p.router_body, p.is_essential, p.router_updated_at
+                    p.router_description, p.router_body, p.is_essential, p.router_updated_at, p.router_when_to_use
              FROM packs p
              INNER JOIN scenario_packs sp ON p.id = sp.pack_id
              WHERE sp.scenario_id = ?1
@@ -1718,7 +1719,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.icon, p.color, p.sort_order, p.created_at, p.updated_at,
-                    p.router_description, p.router_body, p.is_essential, p.router_updated_at
+                    p.router_description, p.router_body, p.is_essential, p.router_updated_at, p.router_when_to_use
              FROM packs p
              INNER JOIN agent_extra_packs aep ON p.id = aep.pack_id
              WHERE aep.tool_key = ?1
@@ -1992,6 +1993,7 @@ fn map_pack_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PackRecord> {
         router_body: row.get(9)?,
         is_essential: row.get::<_, i64>(10)? != 0,
         router_updated_at: row.get(11)?,
+        router_when_to_use: row.get(12)?,
     })
 }
 
@@ -2570,6 +2572,32 @@ mod pack_tests {
 
         // base + shared (from scenario), then extra (from extras). Shared appears once.
         assert_eq!(pack_names, vec!["base", "shared", "extra"]);
+    }
+
+    #[test]
+    fn pack_record_round_trips_router_when_to_use() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p-x", "pack-x", None, None, None)
+            .unwrap();
+        // Directly write via SQL since set_pack_when_to_use arrives in Task 4.
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE packs SET router_when_to_use = ?1 WHERE id = 'p-x'",
+                ["Trigger when user says X"],
+            )
+            .unwrap();
+        }
+        let packs = store.get_all_packs().unwrap();
+        let px = packs
+            .iter()
+            .find(|p| p.id == "p-x")
+            .expect("pack-x missing");
+        assert_eq!(
+            px.router_when_to_use.as_deref(),
+            Some("Trigger when user says X")
+        );
     }
 }
 

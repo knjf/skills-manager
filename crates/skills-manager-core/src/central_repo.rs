@@ -55,3 +55,10 @@ pub fn ensure_central_repo() -> Result<()> {
 
     Ok(())
 }
+
+/// After the DB has been opened + migrated, ensure the builtin sm pack
+/// exists with L1 + L2 + skill associations. Idempotent; safe on every startup.
+pub fn ensure_sm_pack_installed(store: &crate::skill_store::SkillStore) -> Result<()> {
+    crate::pack_seeder::ensure_sm_pack(store)?;
+    Ok(())
+}

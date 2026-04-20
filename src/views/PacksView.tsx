@@ -836,10 +836,10 @@ export function PacksView() {
                       <span
                         className={`text-[11px] px-1.5 py-0.5 rounded ${
                           pack.router_description && pack.router_when_to_use
-                            ? "bg-green-100 text-green-700"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                             : pack.router_description || pack.router_when_to_use
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-gray-100 text-gray-500"
+                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                         }`}
                         title={
                           pack.router_description && pack.router_when_to_use

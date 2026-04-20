@@ -18,6 +18,14 @@ type Props = {
   onPreview?: () => void;
 };
 
+const textareaClass =
+  "w-full bg-background border border-border-subtle rounded-[4px] px-3 py-2 font-mono text-[13px] text-secondary focus:outline-none focus:border-border transition-all placeholder-faint";
+
+const buttonBase =
+  "px-3 py-1.5 rounded-[4px] text-[13px] transition-colors";
+const buttonPrimary = `${buttonBase} bg-accent text-white hover:opacity-90 disabled:opacity-50`;
+const buttonSecondary = `${buttonBase} border border-border-subtle text-secondary hover:bg-surface-hover`;
+
 export function RouterEditor({
   initial,
   onSave,
@@ -31,18 +39,18 @@ export function RouterEditor({
   const combinedLen = desc.length + whenToUse.length;
   const color =
     combinedLen <= 1400
-      ? "text-green-600"
+      ? "text-emerald-600 dark:text-emerald-400"
       : combinedLen <= 1536
-      ? "text-yellow-600"
-      : "text-red-600";
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-red-600 dark:text-red-400";
   const canSave = desc.trim().length > 0 && combinedLen <= 1536;
 
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="text-sm font-medium">Router description</span>
+        <span className="text-sm font-medium text-primary">Router description</span>
         <textarea
-          className="w-full border rounded p-2 font-mono text-sm"
+          className={`${textareaClass} mt-1`}
           rows={3}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
@@ -51,9 +59,9 @@ export function RouterEditor({
       </label>
 
       <label className="block">
-        <span className="text-sm font-medium">When to use (trigger phrases)</span>
+        <span className="text-sm font-medium text-primary">When to use (trigger phrases)</span>
         <textarea
-          className="w-full border rounded p-2 font-mono text-sm"
+          className={`${textareaClass} mt-1`}
           rows={2}
           value={whenToUse}
           onChange={(e) => setWhenToUse(e.target.value)}
@@ -67,11 +75,11 @@ export function RouterEditor({
       </div>
 
       <label className="block">
-        <span className="text-sm font-medium">
+        <span className="text-sm font-medium text-primary">
           Body (optional — leave empty for auto-render)
         </span>
         <textarea
-          className="w-full border rounded p-2 font-mono text-sm"
+          className={`${textareaClass} mt-1`}
           rows={8}
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -82,7 +90,7 @@ export function RouterEditor({
       <div className="flex gap-2">
         <button
           type="button"
-          className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+          className={buttonPrimary}
           disabled={!canSave}
           onClick={() =>
             onSave({
@@ -97,7 +105,7 @@ export function RouterEditor({
         {onGenerate && (
           <button
             type="button"
-            className="px-3 py-1 border rounded"
+            className={buttonSecondary}
             onClick={onGenerate}
           >
             Generate with Claude Code
@@ -106,7 +114,7 @@ export function RouterEditor({
         {onPreview && (
           <button
             type="button"
-            className="px-3 py-1 border rounded"
+            className={buttonSecondary}
             onClick={onPreview}
           >
             Preview Sync Output

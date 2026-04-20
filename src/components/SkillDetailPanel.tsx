@@ -31,6 +31,9 @@ interface Props {
   toolToggles?: SkillToolToggle[] | null;
   togglingTool?: string | null;
   onToggleTool?: (tool: string, enabled: boolean) => void;
+  sisterSkills?: Array<{ id: string; name: string; description_router: string | null }>;
+  onSaveDescriptionRouter?: (skillId: string, text: string | null) => Promise<void>;
+  onSelectSibling?: (skillId: string) => void;
 }
 
 export function SkillDetailPanel({
@@ -39,6 +42,9 @@ export function SkillDetailPanel({
   toolToggles,
   togglingTool,
   onToggleTool,
+  sisterSkills,
+  onSaveDescriptionRouter,
+  onSelectSibling,
 }: Props) {
   const { t } = useTranslation();
   const [doc, setDoc] = useState<SkillDocument | null>(null);
@@ -48,6 +54,10 @@ export function SkillDetailPanel({
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false);
   const [isAgentSectionExpanded, setIsAgentSectionExpanded] = useState(false);
   const [contentTab, setContentTab] = useState<"local" | "diff" | "source">("local");
+  const [routerDescDraft, setRouterDescDraft] = useState(
+    skill?.description_router ?? ""
+  );
+  const [savingRouterDesc, setSavingRouterDesc] = useState(false);
   const localRequestIdRef = useRef(0);
   const sourceRequestIdRef = useRef(0);
   const skillId = skill?.id ?? null;
@@ -122,6 +132,10 @@ export function SkillDetailPanel({
   useEffect(() => {
     setContentTab("local");
   }, [skillId]);
+
+  useEffect(() => {
+    setRouterDescDraft(skill?.description_router ?? "");
+  }, [skill?.id, skill?.description_router]);
 
   if (!skill) return null;
 
@@ -330,6 +344,80 @@ export function SkillDetailPanel({
         )}
 
         <div className="px-5 py-5 scrollbar-hide">
+          {skill && onSaveDescriptionRouter && (
+            <section className="border rounded p-3 mb-4 bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold">Router description (L2)</h3>
+                <span className="text-xs text-gray-500">
+                  {routerDescDraft.length} chars
+                </span>
+              </div>
+              <textarea
+                className="w-full border rounded p-2 font-mono text-sm"
+                rows={2}
+                value={routerDescDraft}
+                onChange={(e) => setRouterDescDraft(e.target.value)}
+                aria-label="Router description (L2)"
+                placeholder="Short per-skill line shown in pack router body. e.g. 'Perplexity single answer. → Pick for ...'"
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-50"
+                  disabled={savingRouterDesc}
+                  onClick={async () => {
+                    if (!skill) return;
+                    setSavingRouterDesc(true);
+                    try {
+                      await onSaveDescriptionRouter(
+                        skill.id,
+                        routerDescDraft.trim() || null
+                      );
+                    } finally {
+                      setSavingRouterDesc(false);
+                    }
+                  }}
+                >
+                  Save router description
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 border rounded text-sm"
+                  onClick={() => setRouterDescDraft("")}
+                >
+                  Clear
+                </button>
+              </div>
+            </section>
+          )}
+
+          {sisterSkills && sisterSkills.length > 0 && (
+            <section className="border rounded p-3 mb-4">
+              <h3 className="text-sm font-semibold mb-2">
+                Sibling skills in this pack
+              </h3>
+              <ul className="space-y-1 text-sm">
+                {sisterSkills.map((sib) => (
+                  <li key={sib.id}>
+                    <button
+                      type="button"
+                      className="text-left hover:underline"
+                      onClick={() => onSelectSibling?.(sib.id)}
+                    >
+                      <span className="font-mono">{sib.name}</span>
+                      {": "}
+                      {sib.description_router ? (
+                        <span className="text-gray-700">{sib.description_router}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">(no L2 authored)</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {supportsSourceDiff && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {(["local", "diff", "source"] as const).map((tab) => (

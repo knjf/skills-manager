@@ -1,11 +1,19 @@
 import { useState } from "react";
 
-type Initial = { description: string; body?: string | null };
+type Initial = {
+  description: string;
+  body?: string | null;
+  whenToUse?: string | null;
+};
 
 type Props = {
   packId: string;
   initial: Initial;
-  onSave: (v: { description: string; body: string | null }) => Promise<void>;
+  onSave: (v: {
+    description: string;
+    body: string | null;
+    whenToUse: string | null;
+  }) => Promise<void>;
   onGenerate?: () => void;
   onPreview?: () => void;
 };
@@ -18,10 +26,16 @@ export function RouterEditor({
 }: Props) {
   const [desc, setDesc] = useState(initial.description);
   const [body, setBody] = useState(initial.body ?? "");
-  const len = desc.length;
+  const [whenToUse, setWhenToUse] = useState(initial.whenToUse ?? "");
+
+  const combinedLen = desc.length + whenToUse.length;
   const color =
-    len <= 400 ? "text-green-600" : len <= 600 ? "text-yellow-600" : "text-red-600";
-  const canSave = desc.trim().length > 0;
+    combinedLen <= 1400
+      ? "text-green-600"
+      : combinedLen <= 1536
+      ? "text-yellow-600"
+      : "text-red-600";
+  const canSave = desc.trim().length > 0 && combinedLen <= 1536;
 
   return (
     <div className="space-y-3">
@@ -35,8 +49,21 @@ export function RouterEditor({
           aria-label="Router description"
         />
       </label>
+
+      <label className="block">
+        <span className="text-sm font-medium">When to use (trigger phrases)</span>
+        <textarea
+          className="w-full border rounded p-2 font-mono text-sm"
+          rows={2}
+          value={whenToUse}
+          onChange={(e) => setWhenToUse(e.target.value)}
+          aria-label="When to use"
+          placeholder="Use when user says '...', '...'"
+        />
+      </label>
+
       <div data-testid="char-counter" className={`text-xs ${color}`}>
-        {len} chars (target 150–400)
+        {combinedLen} / 1536 chars (description + when_to_use)
       </div>
 
       <label className="block">
@@ -58,7 +85,11 @@ export function RouterEditor({
           className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
           disabled={!canSave}
           onClick={() =>
-            onSave({ description: desc.trim(), body: body.trim() || null })
+            onSave({
+              description: desc.trim(),
+              body: body.trim() || null,
+              whenToUse: whenToUse.trim() || null,
+            })
           }
         >
           Save

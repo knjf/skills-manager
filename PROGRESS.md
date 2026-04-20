@@ -64,6 +64,22 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
 
+### Skills Manager Skills Pack ✅
+**Status:** Complete (PR pending) **Date:** 2026-04-21
+**Goal:** Ship a builtin `sm` pack (8 skills, essential) that teaches Claude Code how to use Skills Manager itself. Any user with `sm` installed gets AI-guided operation via Claude sessions.
+**Changes:**
+- 8 new `SKILL.md` assets under `crates/skills-manager-core/assets/builtin-skills/sm-*/` — sm-overview / scenarios / packs / skills / authoring / debug / agents / install
+- `builtin_skills.rs` refactored — `BUILTIN_SKILLS` slice embeds all 9 skills (1 pre-existing + 8 new) via `include_str!`; installer loops uniformly; added `SM_SKILL_NAMES` public const
+- `pack_seeder::ensure_sm_pack()` — fully idempotent: creates `sm` pack (essential) + L1 `router_description` + `router_when_to_use` + inserts missing DB skill records for 8 sm-* names + links into every scenario + sets per-skill L2 `description_router`. Safe to call every startup
+- `central_repo::ensure_sm_pack_installed()` wrapper called from CLI `open_store()` and Tauri app startup — ensures vault + DB + pack all in sync on every invocation
+- CLI `open_store()` now calls `ensure_central_repo()` first (CLI didn't previously, only Tauri did) so the installer runs for CLI users too
+- 1 new CLI integration test (`tests/sm_pack.rs`), 2 new pack_seeder unit tests
+**Verified end-to-end:**
+- `sm list` triggers installer + seeder: 8 sm-* dirs appear in `~/.skills-manager/skills/`, DB has sm pack (essential, L1 set, when_to_use set), 8 skills linked with L2 each, pack present in all 7 default scenarios
+- `sm switch claude_code standard-marketing` materializes all 8 sm-* skills into `~/.claude/skills/` (essential pack → direct sync)
+- Idempotent: second invocation is a no-op
+- Workspace tests: 275 pass (266 core + 9 CLI integration), 0 failures
+
 ### Pack Content Authoring ✅
 **Status:** Complete **Date:** 2026-04-21
 **Goal:** Populate L1 (`router_description` + `router_when_to_use`) and L2 (per-skill `description_router`) for all 8 non-essential packs so hybrid mode sessions surface triggerable router descriptions.

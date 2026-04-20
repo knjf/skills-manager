@@ -234,6 +234,7 @@ pub fn import_with_dedup(store: &SkillStore, discovered_id: &str) -> Result<Impo
         update_status: "unknown".to_string(),
         last_checked_at: None,
         last_check_error: None,
+        description_router: None,
     };
     store.insert_skill(&skill_record)?;
     installer::capture_install_version(store, &skill_id, &install_result.central_path);
@@ -294,6 +295,7 @@ pub fn import_orphan_central_skills(store: &SkillStore) -> Result<usize> {
             update_status: "local_only".to_string(),
             last_checked_at: Some(now),
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&record)?;
         installer::capture_install_version(store, &id, &path);

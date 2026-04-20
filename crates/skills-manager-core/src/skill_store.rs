@@ -35,6 +35,7 @@ pub struct SkillRecord {
     pub update_status: String,
     pub last_checked_at: Option<i64>,
     pub last_check_error: Option<String>,
+    pub description_router: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -211,9 +212,10 @@ impl SkillStore {
             "INSERT INTO skills (
                 id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                 source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                description_router
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
             params![
                 skill.id,
                 skill.name,
@@ -234,6 +236,7 @@ impl SkillStore {
                 skill.update_status,
                 skill.last_checked_at,
                 skill.last_check_error,
+                skill.description_router,
             ],
         )?;
         Ok(())
@@ -244,7 +247,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills ORDER BY name",
         )?;
         let rows = stmt.query_map([], map_skill_row)?;
@@ -256,7 +260,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], map_skill_row)?;
@@ -268,7 +273,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE central_path = ?1",
         )?;
         let mut rows = stmt.query_map(params![central_path], map_skill_row)?;
@@ -284,7 +290,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills
              WHERE source_type = ?1 AND source_ref = ?2",
         )?;
@@ -619,7 +626,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE name = ?1",
         )?;
         let mut rows = stmt.query_map(params![name], map_skill_row)?;
@@ -954,7 +962,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM skills s
              INNER JOIN scenario_skills ss ON s.id = ss.skill_id
              WHERE ss.scenario_id = ?1
@@ -1519,7 +1528,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM skills s
              INNER JOIN pack_skills ps ON s.id = ps.skill_id
              WHERE ps.pack_id = ?1
@@ -1752,7 +1762,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM (
                  SELECT ps.skill_id AS id, sp.sort_order * 10000 + ps.sort_order AS effective_order
                  FROM pack_skills ps
@@ -1786,7 +1797,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM (
                  SELECT ps.skill_id AS id, sp.sort_order * 10000 + ps.sort_order AS effective_order
                  FROM pack_skills ps
@@ -2018,6 +2030,7 @@ fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord> {
         update_status: row.get(16)?,
         last_checked_at: row.get(17)?,
         last_check_error: row.get(18)?,
+        description_router: row.get(19)?,
     })
 }
 
@@ -2055,6 +2068,7 @@ mod pack_tests {
             update_status: "unknown".to_string(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&rec).unwrap();
         rec
@@ -2599,6 +2613,24 @@ mod pack_tests {
             Some("Trigger when user says X")
         );
     }
+
+    #[test]
+    fn skill_record_round_trips_description_router() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-x", "skill-x");
+        // Directly write via SQL since set_skill_description_router arrives in Task 4.
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE skills SET description_router = ?1 WHERE id = 's-x'",
+                ["Short router line"],
+            )
+            .unwrap();
+        }
+        let all = store.get_all_skills().unwrap();
+        let sx = all.iter().find(|s| s.id == "s-x").expect("s-x missing");
+        assert_eq!(sx.description_router.as_deref(), Some("Short router line"));
+    }
 }
 
 #[cfg(test)]
@@ -2880,6 +2912,7 @@ mod agent_tests {
             update_status: "unknown".to_string(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&rec).unwrap();
         rec

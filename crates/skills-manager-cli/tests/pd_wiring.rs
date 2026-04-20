@@ -75,6 +75,7 @@ fn seed_test_state(home: &std::path::Path) {
         update_status: "idle".into(),
         last_checked_at: None,
         last_check_error: None,
+        description_router: None,
     };
     store
         .insert_skill(&mk_skill("sk-base", "base-skill"))

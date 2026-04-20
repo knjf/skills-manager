@@ -1183,6 +1183,7 @@ fn store_installed_skill(
         update_status: metadata.update_status.clone(),
         last_checked_at: Some(now),
         last_check_error: None,
+        description_router: None,
     };
 
     store.insert_skill(&record).map_err(AppError::db)?;

@@ -188,6 +188,7 @@ fn reconcile_skills_index(store: &SkillStore) -> anyhow::Result<()> {
             update_status: "local_only".to_string(),
             last_checked_at: Some(now),
             last_check_error: None,
+            description_router: None,
         };
 
         store.insert_skill(&record)?;

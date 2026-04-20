@@ -58,11 +58,17 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Status:** Merged (subsumed by Progressive Disclosure)
 **Goal:** Seed 132 skills into 9 packs (base, gstack, marketing, etc.) on first run
 
-### Progressive Disclosure ✅
+### Progressive Disclosure ✅ (partial — sync wiring incomplete)
 **PR:** (pending) **Status:** Merged 2026-04-19
 **Goal:** Reduce Claude Code system-prompt tokens ~85% via file-based pack routers + Read-on-demand.
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
+
+### PD Sync Wiring ✅
+**Status:** Complete (PR pending) **Date:** 2026-04-20
+**Discovered:** While drafting router descriptions for marketing pack, found `reconcile_agent_dir` (the disclosure-mode-aware sync) was only invoked from unit tests. Production sync path (`sync_scenario` in CLI, Tauri sync command) bypassed disclosure mode and always materialized every skill (Full mode behaviour).
+**Done:** Wired `reconcile_agent_dir` + `unreconcile_agent_dir` into both CLI (`sync_scenario`, `sync_agent`, `unsync_scenario`) and Tauri (`sync_agent_skills`, `unsync_agent_skills`). Added store helpers `get_packs_with_skills_for_scenario`/`_for_agent`. Added per-skill exclusion threading through `resolve_desired_state` for tool-toggle compatibility. Added CLI `sm scenario set-mode` + `sm pack set-essential`. 4 new integration tests in `crates/skills-manager-cli/tests/pd_wiring.rs`. Total 259 tests passing.
+**Verified end-to-end:** `sm pack set-essential base true` → `sm scenario set-mode standard-marketing hybrid` → `sm switch claude_code standard-marketing` produces 17 essential skill symlinks + 7 `pack-*` router dirs in `~/.claude/skills/`. `pack-marketing/SKILL.md` correctly shows our router description + auto-rendered skill table with vault paths. Switching back to `everything` (full mode) removes all `pack-*` dirs. New Claude Code sessions immediately see the router descriptions instead of individual skill descriptions — confirmed via system reminder showing 7 `pack-*` entries during the e2e walkthrough.
 
 ### Dashboard Update ⬜
 **Status:** Planned

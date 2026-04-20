@@ -4745,6 +4745,7 @@ dependencies = [
  "chrono",
  "clap",
  "skills-manager-core",
+ "tempfile",
 ]
 
 [[package]]

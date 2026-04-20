@@ -122,6 +122,7 @@ pub fn reconcile_agent_dir(
     packs: &[disclosure::PackWithSkills<'_>],
     mode: crate::skill_store::DisclosureMode,
     vault_root: &Path,
+    excluded_skills: &std::collections::HashSet<String>,
 ) -> Result<ReconcileReport> {
     use disclosure::{resolve_desired_state, EntryKind};
     use std::collections::HashSet;
@@ -130,7 +131,7 @@ pub fn reconcile_agent_dir(
     fs::create_dir_all(agent_skills_dir)
         .with_context(|| format!("create agent skills dir {}", agent_skills_dir.display()))?;
 
-    let desired = resolve_desired_state(agent_skills_dir, packs, mode);
+    let desired = resolve_desired_state(agent_skills_dir, packs, mode, excluded_skills);
     let desired_paths: HashSet<_> = desired.iter().map(|e| e.target_path.clone()).collect();
     let mut report = ReconcileReport::default();
 
@@ -187,16 +188,37 @@ pub fn reconcile_agent_dir(
             if !is_sm_managed(&p)? {
                 continue;
             }
-            if p.is_dir() {
-                fs::remove_dir_all(&p)?;
-            } else {
-                fs::remove_file(&p)?;
-            }
+            remove_target(&p)?;
             report.removed += 1;
         }
     }
 
     Ok(report)
+}
+
+/// Remove every SM-managed entry from an agent's skills directory.
+/// Used when unsyncing a scenario; complements `reconcile_agent_dir`.
+/// Returns the number of entries removed. Native (non-SM) entries are left alone.
+pub fn unreconcile_agent_dir(agent_skills_dir: &Path) -> Result<usize> {
+    use std::fs;
+    if !agent_skills_dir.exists() {
+        return Ok(0);
+    }
+    let mut removed = 0;
+    for entry in fs::read_dir(agent_skills_dir)? {
+        let entry = entry?;
+        let p = entry.path();
+        if !is_sm_managed(&p)? {
+            continue;
+        }
+        if p.is_dir() && !p.is_symlink() {
+            fs::remove_dir_all(&p)?;
+        } else {
+            fs::remove_file(&p)?;
+        }
+        removed += 1;
+    }
+    Ok(removed)
 }
 
 /// Heuristic detection of entries SM previously wrote:
@@ -494,8 +516,14 @@ mod tests {
             },
         ];
 
-        let report =
-            reconcile_agent_dir(&agent_dir, &packs, DisclosureMode::Hybrid, &vault_root).unwrap();
+        let report = reconcile_agent_dir(
+            &agent_dir,
+            &packs,
+            DisclosureMode::Hybrid,
+            &vault_root,
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
 
         // Essential skill remains; non-essential gone; router exists.
         assert!(
@@ -551,8 +579,14 @@ mod tests {
             },
         ];
 
-        let report =
-            reconcile_agent_dir(&agent_dir, &packs, DisclosureMode::Full, &vault_root).unwrap();
+        let report = reconcile_agent_dir(
+            &agent_dir,
+            &packs,
+            DisclosureMode::Full,
+            &vault_root,
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
 
         assert!(agent_dir.join("find-skills").exists());
         assert!(
@@ -592,7 +626,14 @@ mod tests {
                 skills: &dom_skills,
             },
         ];
-        reconcile_agent_dir(&agent_dir, &packs1, DisclosureMode::Hybrid, &vault_root).unwrap();
+        reconcile_agent_dir(
+            &agent_dir,
+            &packs1,
+            DisclosureMode::Hybrid,
+            &vault_root,
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
         let md = agent_dir.join("pack-mkt-seo/SKILL.md");
         let first = fs::read_to_string(&md).unwrap();
         assert!(first.contains("Original trigger"));
@@ -609,12 +650,147 @@ mod tests {
                 skills: &dom_skills,
             },
         ];
-        let report =
-            reconcile_agent_dir(&agent_dir, &packs2, DisclosureMode::Hybrid, &vault_root).unwrap();
+        let report = reconcile_agent_dir(
+            &agent_dir,
+            &packs2,
+            DisclosureMode::Hybrid,
+            &vault_root,
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
         let second = fs::read_to_string(&md).unwrap();
         assert!(second.contains("Updated trigger text"));
         assert!(!second.contains("Original trigger"));
         assert_ne!(first, second);
         assert!(report.rendered_routers >= 1);
+    }
+
+    #[test]
+    fn reconcile_with_excluded_skills_skips_them() {
+        use std::collections::HashSet;
+        let tmp = tempdir().unwrap();
+        let agent_dir = tmp.path().join("agent");
+        let vault_root = tmp.path().join("vault");
+        fs::create_dir_all(vault_root.join("alpha")).unwrap();
+        fs::create_dir_all(vault_root.join("beta")).unwrap();
+        fs::write(vault_root.join("alpha/SKILL.md"), "alpha-content").unwrap();
+        fs::write(vault_root.join("beta/SKILL.md"), "beta-content").unwrap();
+
+        let p = PackRecord {
+            id: "p-ess".into(),
+            name: "ess".into(),
+            description: None,
+            icon: None,
+            color: None,
+            sort_order: 0,
+            created_at: 0,
+            updated_at: 0,
+            router_description: None,
+            router_body: None,
+            is_essential: true,
+            router_updated_at: None,
+        };
+        let skills = vec![
+            SkillRecord {
+                id: "alpha".into(),
+                name: "alpha".into(),
+                description: None,
+                source_type: "local".into(),
+                source_ref: None,
+                source_ref_resolved: None,
+                source_subpath: None,
+                source_branch: None,
+                source_revision: None,
+                remote_revision: None,
+                central_path: vault_root.join("alpha").to_string_lossy().into(),
+                content_hash: None,
+                enabled: true,
+                created_at: 0,
+                updated_at: 0,
+                status: "active".into(),
+                update_status: "idle".into(),
+                last_checked_at: None,
+                last_check_error: None,
+            },
+            SkillRecord {
+                id: "beta".into(),
+                name: "beta".into(),
+                description: None,
+                source_type: "local".into(),
+                source_ref: None,
+                source_ref_resolved: None,
+                source_subpath: None,
+                source_branch: None,
+                source_revision: None,
+                remote_revision: None,
+                central_path: vault_root.join("beta").to_string_lossy().into(),
+                content_hash: None,
+                enabled: true,
+                created_at: 0,
+                updated_at: 0,
+                status: "active".into(),
+                update_status: "idle".into(),
+                last_checked_at: None,
+                last_check_error: None,
+            },
+        ];
+        let packs = vec![disclosure::PackWithSkills {
+            pack: &p,
+            skills: &skills,
+        }];
+
+        let mut excluded = HashSet::new();
+        excluded.insert("beta".to_string());
+
+        let report = reconcile_agent_dir(
+            &agent_dir,
+            &packs,
+            DisclosureMode::Full,
+            &vault_root,
+            &excluded,
+        )
+        .unwrap();
+
+        assert!(agent_dir.join("alpha").exists());
+        assert!(!agent_dir.join("beta").exists());
+        assert_eq!(report.added, 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unreconcile_removes_routers_and_symlinks_but_leaves_native() {
+        let tmp = tempdir().unwrap();
+        let agent_dir = tmp.path().join("agent");
+        // Use the sm_vault helper so symlink targets contain ".skills-manager/skills"
+        // and is_sm_managed() correctly classifies them as SM-managed.
+        let vault_root = sm_vault(tmp.path());
+        fs::create_dir_all(&agent_dir).unwrap();
+        fs::create_dir_all(vault_root.join("real-skill")).unwrap();
+        fs::write(vault_root.join("real-skill/SKILL.md"), "x").unwrap();
+
+        // 1. SM-managed symlink into vault.
+        std::os::unix::fs::symlink(vault_root.join("real-skill"), agent_dir.join("real-skill"))
+            .unwrap();
+
+        // 2. SM-managed router dir with marker.
+        let router_dir = agent_dir.join("pack-marketing");
+        fs::create_dir_all(&router_dir).unwrap();
+        fs::write(
+            router_dir.join("SKILL.md"),
+            "---\nname: pack-marketing\n---\n# Pack: marketing\n",
+        )
+        .unwrap();
+
+        // 3. Native skill — plain dir, not a symlink, no router marker.
+        let native = agent_dir.join("native-skill");
+        fs::create_dir_all(&native).unwrap();
+        fs::write(native.join("SKILL.md"), "i was here first").unwrap();
+
+        let removed = unreconcile_agent_dir(&agent_dir).unwrap();
+
+        assert_eq!(removed, 2);
+        assert!(!agent_dir.join("real-skill").exists());
+        assert!(!agent_dir.join("pack-marketing").exists());
+        assert!(agent_dir.join("native-skill").exists());
     }
 }

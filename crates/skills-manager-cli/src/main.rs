@@ -69,6 +69,12 @@ enum Commands {
         action: AgentAction,
     },
 
+    /// Manage scenarios (set disclosure mode)
+    Scenario {
+        #[command(subcommand)]
+        action: ScenarioAction,
+    },
+
     /// Deduplicate agent skill directories against the central store.
     /// Replaces identical copies with symlinks.
     Dedup {
@@ -135,6 +141,13 @@ enum PackAction {
     RegenAllRouters,
     /// Evaluate router-description accuracy against canned queries
     EvalRouters,
+    /// Mark a pack as essential (loaded in hybrid mode) or not
+    SetEssential {
+        /// Pack name
+        name: String,
+        /// "true" to mark essential, "false" to unmark
+        value: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -157,6 +170,17 @@ enum AgentAction {
         agent: String,
         /// Pack name
         pack: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ScenarioAction {
+    /// Set the disclosure mode for a scenario
+    SetMode {
+        /// Scenario name
+        name: String,
+        /// Disclosure mode: full | hybrid | router_only
+        mode: String,
     },
 }
 
@@ -183,6 +207,9 @@ fn main() {
             PackAction::GenRouter { name } => commands::cmd_pack_gen_router(&name),
             PackAction::RegenAllRouters => commands::cmd_pack_regen_all_routers(),
             PackAction::EvalRouters => commands::cmd_pack_eval_routers(),
+            PackAction::SetEssential { name, value } => {
+                commands::cmd_pack_set_essential(&name, &value)
+            }
         },
         Commands::Agents => commands::cmd_agents(),
         Commands::Agent { action } => match action {
@@ -191,6 +218,9 @@ fn main() {
             AgentAction::RemovePack { agent, pack } => {
                 commands::cmd_agent_remove_pack(&agent, &pack)
             }
+        },
+        Commands::Scenario { action } => match action {
+            ScenarioAction::SetMode { name, mode } => commands::cmd_scenario_set_mode(&name, &mode),
         },
         Commands::Dedup { apply, agent } => commands::cmd_dedup(apply, agent.as_deref()),
         Commands::SeedPacks { force } => commands::cmd_seed_packs(force),

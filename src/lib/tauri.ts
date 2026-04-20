@@ -743,3 +743,6 @@ export const setPackWhenToUse = (packId: string, text: string | null) =>
 
 export const setSkillDescriptionRouter = (skillId: string, text: string | null) =>
   invoke<void>("set_skill_description_router", { skillId, text });
+
+export const setScenarioDisclosureMode = (scenarioId: string, mode: "full" | "hybrid" | "router_only") =>
+  invoke<void>("set_scenario_disclosure_mode", { scenarioId, mode });

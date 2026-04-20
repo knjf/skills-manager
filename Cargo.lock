@@ -4744,6 +4744,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "serde_yaml",
  "skills-manager-core",
  "tempfile",
 ]

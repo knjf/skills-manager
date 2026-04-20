@@ -1047,3 +1047,43 @@ pub fn cmd_pack_set_essential(name: &str, value: &str) -> Result<()> {
     println!("Pack '{}' is_essential set to {}.", pack.name, essential);
     Ok(())
 }
+
+// ── Skill commands ────────────────────────────────────────
+
+pub fn cmd_skill_set_router_desc(name: &str, description: Option<&str>, clear: bool) -> Result<()> {
+    if description.is_none() && !clear {
+        anyhow::bail!("skill set-router-desc requires --description <text> or --clear");
+    }
+    if description.is_some() && clear {
+        anyhow::bail!("cannot pass both --description and --clear");
+    }
+    let store = open_store()?;
+    let skill = store
+        .get_skill_by_name(name)?
+        .ok_or_else(|| anyhow::anyhow!("skill '{}' not found", name))?;
+    let text = if clear { None } else { description };
+    store.set_skill_description_router(&skill.id, text)?;
+    match text {
+        Some(_) => println!("Router description set for skill '{}'.", skill.name),
+        None => println!("Router description cleared for skill '{}'.", skill.name),
+    }
+    Ok(())
+}
+
+pub fn cmd_skill_import_router_descs(path: &std::path::Path) -> Result<()> {
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let parsed: std::collections::BTreeMap<String, Option<String>> = serde_yaml::from_str(&raw)
+        .with_context(|| format!("failed to parse YAML at {}", path.display()))?;
+    if parsed.is_empty() {
+        anyhow::bail!("no entries in {}", path.display());
+    }
+    let updates: Vec<(String, Option<String>)> = parsed.into_iter().collect();
+    let store = open_store()?;
+    let report = store.bulk_set_skill_description_router(&updates)?;
+    println!(
+        "Updated {} skill(s), skipped {} unknown name(s).",
+        report.updated, report.skipped,
+    );
+    Ok(())
+}

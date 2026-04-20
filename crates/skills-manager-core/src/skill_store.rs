@@ -178,6 +178,13 @@ pub struct ScenarioSkillToolToggleRecord {
     pub updated_at: i64,
 }
 
+/// Result of a bulk description_router update.
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct BulkRouterDescReport {
+    pub updated: usize,
+    pub skipped: usize,
+}
+
 impl SkillStore {
     /// Crate-internal accessor so sibling modules (e.g. version_store) can
     /// share the single Mutex<Connection> without re-opening the database.
@@ -323,6 +330,43 @@ impl SkillStore {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn set_skill_description_router(&self, skill_id: &str, text: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn.execute(
+            "UPDATE skills SET description_router = ?2, updated_at = ?3 WHERE id = ?1",
+            params![skill_id, text, chrono::Utc::now().timestamp_millis()],
+        )?;
+        if n == 0 {
+            anyhow::bail!("skill {skill_id} not found");
+        }
+        Ok(())
+    }
+
+    /// Bulk-update `description_router` for multiple skills keyed by name.
+    /// Unknown skill names are counted in `skipped`; all writes run in one transaction.
+    pub fn bulk_set_skill_description_router(
+        &self,
+        updates: &[(String, Option<String>)],
+    ) -> Result<BulkRouterDescReport> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut report = BulkRouterDescReport::default();
+        for (name, text) in updates {
+            let n = tx.execute(
+                "UPDATE skills SET description_router = ?2, updated_at = ?3 WHERE name = ?1",
+                params![name, text, now],
+            )?;
+            if n == 0 {
+                report.skipped += 1;
+            } else {
+                report.updated += n;
+            }
+        }
+        tx.commit()?;
+        Ok(report)
     }
 
     pub fn update_skill_check_state(
@@ -1490,6 +1534,18 @@ impl SkillStore {
         Ok(())
     }
 
+    pub fn set_pack_when_to_use(&self, pack_id: &str, text: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn.execute(
+            "UPDATE packs SET router_when_to_use = ?2, updated_at = ?3 WHERE id = ?1",
+            params![pack_id, text, chrono::Utc::now().timestamp_millis()],
+        )?;
+        if n == 0 {
+            anyhow::bail!("pack {pack_id} not found");
+        }
+        Ok(())
+    }
+
     pub fn add_skill_to_pack(&self, pack_id: &str, skill_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let max_order: i32 = conn.query_row(
@@ -2630,6 +2686,90 @@ mod pack_tests {
         let all = store.get_all_skills().unwrap();
         let sx = all.iter().find(|s| s.id == "s-x").expect("s-x missing");
         assert_eq!(sx.description_router.as_deref(), Some("Short router line"));
+    }
+
+    // ── Task 4: setter tests ──
+
+    #[test]
+    fn set_pack_when_to_use_writes_and_clears() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p-a", "pack-a", None, None, None)
+            .unwrap();
+
+        store
+            .set_pack_when_to_use("p-a", Some("trigger text"))
+            .unwrap();
+        let p = store.get_pack_by_id("p-a").unwrap().unwrap();
+        assert_eq!(p.router_when_to_use.as_deref(), Some("trigger text"));
+
+        store.set_pack_when_to_use("p-a", None).unwrap();
+        let p = store.get_pack_by_id("p-a").unwrap().unwrap();
+        assert_eq!(p.router_when_to_use, None);
+    }
+
+    #[test]
+    fn set_pack_when_to_use_errors_when_missing() {
+        let (store, _tmp) = test_store();
+        assert!(store.set_pack_when_to_use("p-nope", Some("x")).is_err());
+    }
+
+    #[test]
+    fn set_skill_description_router_writes_and_clears() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-a", "skill-a");
+
+        store
+            .set_skill_description_router("s-a", Some("short"))
+            .unwrap();
+        let s = store.get_skill_by_id("s-a").unwrap().unwrap();
+        assert_eq!(s.description_router.as_deref(), Some("short"));
+
+        store.set_skill_description_router("s-a", None).unwrap();
+        let s = store.get_skill_by_id("s-a").unwrap().unwrap();
+        assert_eq!(s.description_router, None);
+    }
+
+    #[test]
+    fn set_skill_description_router_errors_when_missing() {
+        let (store, _tmp) = test_store();
+        assert!(store
+            .set_skill_description_router("s-nope", Some("x"))
+            .is_err());
+    }
+
+    #[test]
+    fn bulk_set_skill_description_router_atomic() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-a", "skill-a");
+        insert_test_skill(&store, "s-b", "skill-b");
+
+        let updates = vec![
+            ("skill-a".to_string(), Some("A short".to_string())),
+            ("skill-b".to_string(), Some("B short".to_string())),
+            ("skill-missing".to_string(), Some("ignored".to_string())),
+        ];
+        let report = store.bulk_set_skill_description_router(&updates).unwrap();
+        assert_eq!(report.updated, 2);
+        assert_eq!(report.skipped, 1);
+        assert_eq!(
+            store
+                .get_skill_by_id("s-a")
+                .unwrap()
+                .unwrap()
+                .description_router
+                .as_deref(),
+            Some("A short")
+        );
+        assert_eq!(
+            store
+                .get_skill_by_id("s-b")
+                .unwrap()
+                .unwrap()
+                .description_router
+                .as_deref(),
+            Some("B short")
+        );
     }
 }
 

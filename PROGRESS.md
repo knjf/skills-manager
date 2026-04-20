@@ -64,6 +64,21 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
 
+### Three-Tier UI ✅
+**Status:** Complete (PR pending) **Date:** 2026-04-21
+**Goal:** Close GUI gap for three-tier PD — edit `router_when_to_use` + `description_router` from Tauri app so non-technical users don't need the CLI.
+**Changes:**
+- 2 additive Tauri IPC commands: `set_pack_when_to_use`, `set_skill_description_router`
+- `ManagedSkillDto` gains `description_router` field; TS `PackRecord` gains `router_when_to_use`, TS `ManagedSkill` gains `description_router`
+- New TS wrappers `setPackWhenToUse`, `setSkillDescriptionRouter`
+- `RouterEditor` supports `whenToUse` textarea + combined 1536-char counter (red/yellow/green)
+- `PacksView` saves via both `set_pack_router` + `set_pack_when_to_use`, renders L1 coverage pill per pack card (green / yellow / gray)
+- `SkillDetailPanel` gains L2 editor section + sibling-skill list section (gracefully hidden when sisterSkills is empty)
+- `MySkills` shows L2 ✓/— badge per row (grid + list views) + "Show only skills without L2" filter; wires `setSkillDescriptionRouter` on save
+- 2 new staged Vitest test files (RouterEditor 9 tests, SkillDetailPanel 6 tests)
+**Known limitation:** sibling list is currently empty because MySkills doesn't load pack-skill relations. Graceful fallback (section hidden). Future work: load pack membership in MySkills to populate sibling list for the 分叉 helper.
+**Verified:** Rust tests all pass (275+), `pnpm tsc --noEmit` clean, `pnpm run build` clean. Visual e2e requires `pnpm tauri:dev` — performed separately.
+
 ### Skills Manager Skills Pack ✅
 **Status:** Complete (PR pending) **Date:** 2026-04-21
 **Goal:** Ship a builtin `sm` pack (8 skills, essential) that teaches Claude Code how to use Skills Manager itself. Any user with `sm` installed gets AI-guided operation via Claude sessions.

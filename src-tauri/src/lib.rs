@@ -354,6 +354,9 @@ pub fn run() {
         core::skill_store::SkillStore::new(&db_path).expect("Failed to initialize database"),
     );
     commands::tools::migrate_legacy_tool_keys(&store).expect("Failed to migrate legacy tool keys");
+    if let Err(e) = crate::core::central_repo::ensure_sm_pack_installed(&*store) {
+        log::warn!("Failed to ensure sm pack: {}", e);
+    }
     let store_for_setup = store.clone();
     initialize_startup_scenario(&store).expect("Failed to initialize startup scenario");
 

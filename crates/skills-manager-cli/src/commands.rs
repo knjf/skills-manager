@@ -11,7 +11,12 @@ fn open_store() -> Result<SkillStore> {
     if !db_path.exists() {
         bail!("Skills Manager DB not found at {}", db_path.display());
     }
-    SkillStore::new(&db_path).context("Failed to open Skills Manager database")
+    let store = SkillStore::new(&db_path).context("Failed to open Skills Manager database")?;
+    // Ensure builtin sm pack is present (idempotent; cheap after first run).
+    if let Err(e) = central_repo::ensure_sm_pack_installed(&store) {
+        eprintln!("Warning: failed to ensure sm pack: {e}");
+    }
+    Ok(store)
 }
 
 /// Find a scenario by name (case-insensitive).

@@ -20,12 +20,20 @@ pub fn render_router_skill_md(
         .clone()
         .unwrap_or_else(|| auto_render_body(pack, skills, vault_root));
 
-    format!(
-        "---\nname: pack-{}\ndescription: {}\n---\n\n{}\n",
+    let mut frontmatter = format!(
+        "---\nname: pack-{}\ndescription: {}\n",
         pack.name,
         escape_yaml_scalar(desc),
-        body,
-    )
+    );
+    if let Some(when) = pack
+        .router_when_to_use
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
+        frontmatter.push_str(&format!("when_to_use: {}\n", escape_yaml_scalar(when)));
+    }
+    frontmatter.push_str("---\n\n");
+    format!("{}{}\n", frontmatter, body)
 }
 
 fn auto_render_body(pack: &PackRecord, skills: &[SkillRecord], vault_root: &Path) -> String {
@@ -36,14 +44,7 @@ fn auto_render_body(pack: &PackRecord, skills: &[SkillRecord], vault_root: &Path
         pack.name,
     );
     for s in skills {
-        let summary = s
-            .description
-            .as_deref()
-            .unwrap_or("")
-            .split_terminator(['.', '。'])
-            .next()
-            .unwrap_or("")
-            .trim();
+        let summary = skill_row_summary(s);
         out.push_str(&format!(
             "| `{}` | {} | `{}/{}/SKILL.md` |\n",
             s.name,
@@ -53,6 +54,27 @@ fn auto_render_body(pack: &PackRecord, skills: &[SkillRecord], vault_root: &Path
         ));
     }
     out
+}
+
+/// Pick the per-row summary: prefer `description_router` when set and non-empty,
+/// else fall back to first sentence of `description`, else empty.
+fn skill_row_summary(s: &SkillRecord) -> String {
+    if let Some(r) = s
+        .description_router
+        .as_deref()
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+    {
+        return r.to_string();
+    }
+    s.description
+        .as_deref()
+        .unwrap_or("")
+        .split_terminator(['.', '。'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string()
 }
 
 fn escape_yaml_scalar(s: &str) -> String {
@@ -167,5 +189,72 @@ mod tests {
         let a = render_router_skill_md(&p, &skills, &PathBuf::from("/v"));
         let b = render_router_skill_md(&p, &skills, &PathBuf::from("/v"));
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn frontmatter_emits_when_to_use_when_set() {
+        let mut p = pack("mkt", Some("Marketing domain"));
+        p.router_when_to_use = Some("Use when user mentions SEO, CRO, PRD".into());
+        let out = render_router_skill_md(&p, &[], &PathBuf::from("/v"));
+        assert!(
+            out.contains("when_to_use: Use when user mentions SEO, CRO, PRD"),
+            "when_to_use missing; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn frontmatter_omits_when_to_use_when_none() {
+        let p = pack("mkt", Some("Marketing domain"));
+        let out = render_router_skill_md(&p, &[], &PathBuf::from("/v"));
+        assert!(
+            !out.contains("when_to_use:"),
+            "when_to_use should not appear; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn table_uses_description_router_when_set() {
+        let p = pack("mkt", Some("desc"));
+        let mut s = skill(
+            "seo-audit",
+            "Full long original description with lots of words.",
+        );
+        s.description_router = Some("Short router line".into());
+        let out = render_router_skill_md(&p, &[s], &PathBuf::from("/v"));
+        assert!(
+            out.contains("| `seo-audit` | Short router line | `/v/seo-audit/SKILL.md` |"),
+            "expected short router line; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn table_falls_back_to_description_when_router_desc_none() {
+        let p = pack("mkt", Some("desc"));
+        let s = skill("seo-audit", "First sentence. Second sentence.");
+        let out = render_router_skill_md(&p, &[s], &PathBuf::from("/v"));
+        assert!(
+            out.contains("| `seo-audit` | First sentence | `/v/seo-audit/SKILL.md` |"),
+            "expected fallback to first-sentence truncation; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn table_falls_back_when_router_desc_is_empty_string() {
+        let p = pack("mkt", Some("desc"));
+        let mut s = skill("x", "Original desc.");
+        s.description_router = Some("   ".into()); // whitespace-only
+        let out = render_router_skill_md(&p, &[s], &PathBuf::from("/v"));
+        assert!(out.contains("| `x` | Original desc"));
+    }
+
+    #[test]
+    fn yaml_escapes_quotes_in_when_to_use() {
+        let mut p = pack("x", Some("d"));
+        p.router_when_to_use = Some("Use when: \"quoted trigger\"".into());
+        let out = render_router_skill_md(&p, &[], &PathBuf::from("/v"));
+        assert!(
+            out.contains("when_to_use: \"Use when: \\\"quoted trigger\\\"\""),
+            "expected escaped quotes; got:\n{out}"
+        );
     }
 }

@@ -75,8 +75,9 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
     if current > LATEST_VERSION {
         bail!(
-            "Database schema version ({current}) is newer than this app supports ({LATEST_VERSION}). \
-             Please upgrade the application."
+            "Database schema version ({current}) is newer than this binary supports ({LATEST_VERSION}). \
+             Rebuild and reinstall: `cargo install --path crates/skills-manager-cli` \
+             (or rebuild the Tauri app)."
         );
     }
 

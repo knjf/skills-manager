@@ -16,7 +16,12 @@ fn open_store() -> Result<SkillStore> {
     if !db_path.exists() {
         bail!("Skills Manager DB not found at {}", db_path.display());
     }
-    let store = SkillStore::new(&db_path).context("Failed to open Skills Manager database")?;
+    let store = SkillStore::new(&db_path).with_context(|| {
+        format!(
+            "Failed to open Skills Manager database at {}",
+            db_path.display()
+        )
+    })?;
     // Ensure builtin sm pack is present (idempotent; cheap after first run).
     if let Err(e) = central_repo::ensure_sm_pack_installed(&store) {
         eprintln!("Warning: failed to ensure sm pack: {e}");
@@ -545,7 +550,13 @@ pub fn cmd_pack_eval_routers() -> Result<()> {
 fn find_pack_by_name(store: &SkillStore, name: &str) -> Result<skills_manager_core::PackRecord> {
     let packs = store.get_all_packs()?;
     let lower = name.to_lowercase();
-    if let Some(p) = packs.iter().find(|p| p.name.to_lowercase() == lower) {
+    // Accept the filesystem-facing `pack-<id>` prefix (e.g. `pack-gstack`) as an alias
+    // for the internal pack id (`gstack`). This matches the naming under `~/.claude/skills/`.
+    let stripped = lower.strip_prefix("pack-").unwrap_or(&lower);
+    if let Some(p) = packs
+        .iter()
+        .find(|p| p.name.to_lowercase() == lower || p.name.to_lowercase() == stripped)
+    {
         return Ok(p.clone());
     }
     let available: Vec<&str> = packs.iter().map(|p| p.name.as_str()).collect();

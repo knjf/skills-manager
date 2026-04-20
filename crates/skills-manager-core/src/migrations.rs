@@ -404,21 +404,6 @@ fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// v10 → v11: Add three-tier progressive disclosure fields.
-/// `packs.router_when_to_use` — native Claude Code frontmatter field.
-/// `skills.description_router` — per-skill compressed "which-to-pick" line for router body.
-fn migrate_v10_to_v11(conn: &Connection) -> Result<()> {
-    if table_exists(conn, "packs")? {
-        add_column_if_missing(conn, "packs", "router_when_to_use", "TEXT")
-            .context("v10→v11: add packs.router_when_to_use")?;
-    }
-    if table_exists(conn, "skills")? {
-        add_column_if_missing(conn, "skills", "description_router", "TEXT")
-            .context("v10→v11: add skills.description_router")?;
-    }
-    Ok(())
-}
-
 /// v9 → v10: Add skill_versions table for version history.
 fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -441,6 +426,19 @@ fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
             ON skill_versions(skill_id, captured_at DESC);
         ",
     )?;
+    Ok(())
+}
+
+/// v10 → v11: Add three-tier progressive disclosure fields.
+/// `packs.router_when_to_use` — native Claude Code frontmatter field.
+/// `skills.description_router` — per-skill compressed "which-to-pick" line for router body.
+fn migrate_v10_to_v11(conn: &Connection) -> Result<()> {
+    if table_exists(conn, "packs")? {
+        add_column_if_missing(conn, "packs", "router_when_to_use", "TEXT")
+            .context("v10→v11: add packs.router_when_to_use")?;
+    }
+    add_column_if_missing(conn, "skills", "description_router", "TEXT")
+        .context("v10→v11: add skills.description_router")?;
     Ok(())
 }
 

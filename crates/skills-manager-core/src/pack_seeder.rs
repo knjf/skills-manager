@@ -622,6 +622,100 @@ pub fn seed_default_packs(store: &SkillStore, force: bool) -> Result<SeedResult>
     })
 }
 
+/// L1 content for the sm pack.
+const SM_PACK_DESCRIPTION: &str =
+    "Skills Manager (sm) usage reference. Concepts (vault / scenarios / packs / agents / \
+     three-tier Progressive Disclosure), all CLI commands, authoring L1+L2 content, \
+     per-agent config, debugging, install/upgrade.";
+
+const SM_PACK_WHEN_TO_USE: &str =
+    "Use when user asks about 'sm', 'skills manager', 'skill pack', 'router description', \
+     'when_to_use', 'description_router', 'L1/L2', 'how to author', 'how to switch scenario', \
+     'hybrid mode', 'disclosure mode', 'CLI', 'vault'.";
+
+/// L2 (description_router) per sm-* skill.
+const SM_SKILL_L2: &[(&str, &str)] = &[
+    (
+        "sm-overview",
+        "Concept map — vault / scenarios / packs / agents / three-tier PD / disclosure modes. \
+         → Start here if new to sm.",
+    ),
+    (
+        "sm-scenarios",
+        "Manage scenarios: list, switch, set disclosure mode. \
+         → Pick for 'switch scenario', 'enable hybrid'.",
+    ),
+    (
+        "sm-packs",
+        "Author pack L1 (description + when_to_use), mark essential, list packs. \
+         → Pick for pack-level config.",
+    ),
+    (
+        "sm-skills",
+        "Author per-skill L2 (description_router) single + bulk YAML. \
+         → Pick for 'write router description for skill'.",
+    ),
+    (
+        "sm-authoring",
+        "End-to-end L1+L2 workflow: gather → draft → review → import → verify. \
+         Covers 分叉. → Pick for 'how do I author a pack'.",
+    ),
+    (
+        "sm-debug",
+        "Troubleshoot: router not rendering / trigger not hitting / stale binary / sync_mode. \
+         → Pick when something's broken.",
+    ),
+    (
+        "sm-agents",
+        "Per-agent scenario + extra packs. → Pick for 'give agent X different scenario'.",
+    ),
+    (
+        "sm-install",
+        "Install / upgrade / backup / migrate. \
+         → Pick for 'how do I install / back up / migrate'.",
+    ),
+];
+
+/// Idempotently ensure the `sm` pack exists with L1 + L2 populated and all
+/// 8 sm-* skills associated. Safe to call on every startup.
+pub fn ensure_sm_pack(store: &SkillStore) -> Result<()> {
+    // Short-circuit if pack already exists.
+    let all_packs = store.get_all_packs()?;
+    if all_packs.iter().any(|p| p.name == "sm") {
+        return Ok(());
+    }
+
+    let pack_id = Uuid::new_v4().to_string();
+    store.insert_pack(
+        &pack_id,
+        "sm",
+        Some("Skills Manager usage reference — concepts, CLI, authoring, debug."),
+        Some("terminal"),
+        Some("#4f46e5"),
+    )?;
+    store.set_pack_essential(&pack_id, true)?;
+
+    // Set L1.
+    let now = chrono::Utc::now().timestamp();
+    store.set_pack_router(
+        &pack_id,
+        Some(SM_PACK_DESCRIPTION),
+        None, // body — use auto-rendered skill table
+        now,
+    )?;
+    store.set_pack_when_to_use(&pack_id, Some(SM_PACK_WHEN_TO_USE))?;
+
+    // Link skills + set L2 per skill.
+    let all_skills = store.get_all_skills()?;
+    for (skill_name, l2) in SM_SKILL_L2 {
+        if let Some(skill) = all_skills.iter().find(|s| s.name == *skill_name) {
+            store.add_skill_to_pack(&pack_id, &skill.id)?;
+            store.set_skill_description_router(&skill.id, Some(l2))?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -907,5 +1001,61 @@ mod tests {
         seed_default_packs(&store, true).unwrap();
         assert_eq!(store.get_all_packs().unwrap().len(), packs_first);
         assert_eq!(store.get_all_scenarios().unwrap().len(), scenarios_first);
+    }
+
+    #[test]
+    fn ensure_sm_pack_creates_pack_with_skills_and_l1_l2() {
+        let store = test_store();
+
+        // First: insert the 8 sm-* skills as if install_builtin_skills had run.
+        for name in crate::builtin_skills::SM_SKILL_NAMES {
+            insert_test_skill(&store, name);
+        }
+
+        // Run the seeder.
+        ensure_sm_pack(&store).unwrap();
+
+        // Pack exists, is essential.
+        let all_packs = store.get_all_packs().unwrap();
+        let pack = all_packs
+            .iter()
+            .find(|p| p.name == "sm")
+            .expect("sm pack missing");
+        assert!(pack.is_essential, "sm pack should be essential");
+
+        // L1 set.
+        assert!(
+            pack.router_description.is_some(),
+            "router_description should be set"
+        );
+        assert!(
+            pack.router_when_to_use.is_some(),
+            "router_when_to_use should be set"
+        );
+
+        // All 8 skills associated.
+        let skills = store.get_skills_for_pack(&pack.id).unwrap();
+        assert_eq!(skills.len(), 8);
+
+        // Each skill has L2 set.
+        for s in &skills {
+            assert!(
+                s.description_router.is_some(),
+                "skill {} should have description_router set",
+                s.name
+            );
+        }
+    }
+
+    #[test]
+    fn ensure_sm_pack_is_idempotent() {
+        let store = test_store();
+        for name in crate::builtin_skills::SM_SKILL_NAMES {
+            insert_test_skill(&store, name);
+        }
+        ensure_sm_pack(&store).unwrap();
+        ensure_sm_pack(&store).unwrap(); // second call should no-op
+        let packs = store.get_all_packs().unwrap();
+        assert_eq!(packs.iter().filter(|p| p.name == "sm").count(), 1);
     }
 }

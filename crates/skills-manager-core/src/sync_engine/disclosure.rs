@@ -83,6 +83,7 @@ mod tests {
             router_body: None,
             is_essential: essential,
             router_updated_at: None,
+            router_when_to_use: None,
         }
     }
 
@@ -107,6 +108,7 @@ mod tests {
             update_status: "idle".into(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         }
     }
 

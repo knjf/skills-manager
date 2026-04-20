@@ -96,6 +96,12 @@ enum Commands {
     /// Import orphan skills from central store that have no DB record
     #[command(alias = "fo")]
     FixOrphans,
+
+    /// Manage individual skills (router description, bulk import)
+    Skill {
+        #[command(subcommand)]
+        action: SkillAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -129,6 +135,12 @@ enum PackAction {
         /// Path to a file whose contents become the router body
         #[arg(long)]
         body: Option<std::path::PathBuf>,
+        /// Trigger / when-to-use text (native Claude Code frontmatter field)
+        #[arg(long = "when-to-use")]
+        when_to_use: Option<String>,
+        /// Clear the when-to-use field (set to NULL)
+        #[arg(long = "clear-when-to-use")]
+        clear_when_to_use: bool,
     },
     /// List packs and their router status
     ListRouters,
@@ -184,6 +196,27 @@ enum ScenarioAction {
     },
 }
 
+#[derive(Subcommand)]
+enum SkillAction {
+    /// Set or clear a skill's router description (L2 per-skill line)
+    SetRouterDesc {
+        /// Skill name
+        name: String,
+        /// Router description text (the L2 short line)
+        #[arg(long)]
+        description: Option<String>,
+        /// Clear the router description (set to NULL)
+        #[arg(long = "clear")]
+        clear: bool,
+    },
+    /// Bulk-import router descriptions from a YAML file
+    /// (top-level keys are skill names, values are strings or null)
+    ImportRouterDescs {
+        /// Path to YAML file
+        file: std::path::PathBuf,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -202,7 +235,15 @@ fn main() {
                 name,
                 description,
                 body,
-            } => commands::cmd_pack_set_router(&name, description.as_deref(), body.as_deref()),
+                when_to_use,
+                clear_when_to_use,
+            } => commands::cmd_pack_set_router(
+                &name,
+                description.as_deref(),
+                body.as_deref(),
+                when_to_use.as_deref(),
+                clear_when_to_use,
+            ),
             PackAction::ListRouters => commands::cmd_pack_list_routers(),
             PackAction::GenRouter { name } => commands::cmd_pack_gen_router(&name),
             PackAction::RegenAllRouters => commands::cmd_pack_regen_all_routers(),
@@ -225,6 +266,16 @@ fn main() {
         Commands::Dedup { apply, agent } => commands::cmd_dedup(apply, agent.as_deref()),
         Commands::SeedPacks { force } => commands::cmd_seed_packs(force),
         Commands::FixOrphans => commands::cmd_fix_orphans(),
+        Commands::Skill { action } => match action {
+            SkillAction::SetRouterDesc {
+                name,
+                description,
+                clear,
+            } => commands::cmd_skill_set_router_desc(&name, description.as_deref(), clear),
+            SkillAction::ImportRouterDescs { file } => {
+                commands::cmd_skill_import_router_descs(&file)
+            }
+        },
     };
 
     if let Err(e) = result {

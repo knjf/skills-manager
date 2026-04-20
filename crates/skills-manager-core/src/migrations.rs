@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Current schema version. Bump this when adding a new migration.
-const LATEST_VERSION: u32 = 10;
+const LATEST_VERSION: u32 = 11;
 
 const PLUGINS_SCHEMA_DDL: &str = "
     CREATE TABLE IF NOT EXISTS managed_plugins (
@@ -117,6 +117,7 @@ fn migrate_step(conn: &Connection, from_version: u32) -> Result<()> {
         7 => migrate_v7_to_v8(conn),
         8 => migrate_v8_to_v9(conn),
         9 => migrate_v9_to_v10(conn),
+        10 => migrate_v10_to_v11(conn),
         _ => bail!("unknown migration version: {from_version}"),
     }
 }
@@ -425,6 +426,19 @@ fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
             ON skill_versions(skill_id, captured_at DESC);
         ",
     )?;
+    Ok(())
+}
+
+/// v10 → v11: Add three-tier progressive disclosure fields.
+/// `packs.router_when_to_use` — native Claude Code frontmatter field.
+/// `skills.description_router` — per-skill compressed "which-to-pick" line for router body.
+fn migrate_v10_to_v11(conn: &Connection) -> Result<()> {
+    if table_exists(conn, "packs")? {
+        add_column_if_missing(conn, "packs", "router_when_to_use", "TEXT")
+            .context("v10→v11: add packs.router_when_to_use")?;
+    }
+    add_column_if_missing(conn, "skills", "description_router", "TEXT")
+        .context("v10→v11: add skills.description_router")?;
     Ok(())
 }
 
@@ -1175,6 +1189,49 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         assert_eq!(version, LATEST_VERSION);
+    }
+
+    #[test]
+    fn v10_to_v11_adds_three_tier_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        // Boot to v10 first.
+        for v in 0..10 {
+            conn.execute_batch("BEGIN EXCLUSIVE").unwrap();
+            migrate_step(&conn, v).unwrap();
+            conn.pragma_update(None, "user_version", v + 1).unwrap();
+            conn.execute_batch("COMMIT").unwrap();
+        }
+
+        // Run v10 → v11.
+        conn.execute_batch("BEGIN EXCLUSIVE").unwrap();
+        migrate_step(&conn, 10).unwrap();
+        conn.pragma_update(None, "user_version", 11u32).unwrap();
+        conn.execute_batch("COMMIT").unwrap();
+
+        // Verify both columns exist.
+        let pack_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(packs)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(
+            pack_cols.iter().any(|c| c == "router_when_to_use"),
+            "packs.router_when_to_use missing; got columns: {pack_cols:?}"
+        );
+
+        let skill_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(skills)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(
+            skill_cols.iter().any(|c| c == "description_router"),
+            "skills.description_router missing; got columns: {skill_cols:?}"
+        );
     }
 
     #[test]

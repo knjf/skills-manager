@@ -368,6 +368,7 @@ mod tests {
             update_status: "unknown".to_string(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         }
     }
 

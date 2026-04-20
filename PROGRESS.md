@@ -64,6 +64,12 @@ Per-Agent ✅ → Matrix Fix ✅ → Native Skills 🔄 → Pack Seeding ✅ →
 **Changes:** DB v9 migration, 16-pack taxonomy, router_render + disclosure sync engine, pack-router-gen builtin skill, CLI subcommands, Tauri IPC, Frontend (PacksView / ScenariosView / MatrixView / Sidebar / Dashboard).
 **Subsumed:** Default Pack Seeding.
 
+### Three-Tier Progressive Disclosure ✅
+**Status:** Complete (PR pending) **Date:** 2026-04-20
+**Goal:** Split PD into three storage tiers so routers carry authored per-skill differentiation and Claude Code's native `when_to_use` frontmatter field is populated.
+**Changes:** DB v11 (two nullable columns: `packs.router_when_to_use`, `skills.description_router`). `router_render` emits `when_to_use` in frontmatter and prefers `description_router` in the table with fallback to first-sentence of `description`. CLI `pack set-router --when-to-use / --clear-when-to-use` + new `sm skill set-router-desc` + `sm skill import-router-descs` (YAML bulk, transaction-safe). 4 new CLI integration tests.
+**Verified end-to-end:** Set `when_to_use` on `marketing` pack + `description_router` on `prd`. Switched hybrid mode. Rendered `~/.claude/skills/pack-marketing/SKILL.md` contains both frontmatter fields and the custom L2 row text (prd shows "Single-shot PRD authoring — exec summary, user stories, risks." instead of 120-char vendor original). Bulk YAML import updated 3 skills + skipped 1 unknown as expected. Claude Code session surfaced `when_to_use` appended to the description in the skills listing — proving native `when_to_use` integration works.
+
 ### PD Sync Wiring ✅
 **Status:** Complete (PR pending) **Date:** 2026-04-20
 **Discovered:** While drafting router descriptions for marketing pack, found `reconcile_agent_dir` (the disclosure-mode-aware sync) was only invoked from unit tests. Production sync path (`sync_scenario` in CLI, Tauri sync command) bypassed disclosure mode and always materialized every skill (Full mode behaviour).

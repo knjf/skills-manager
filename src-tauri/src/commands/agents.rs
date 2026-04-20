@@ -351,6 +351,7 @@ pub async fn import_discovered_skill(
             update_status: "local_only".to_string(),
             last_checked_at: Some(now),
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&record).map_err(AppError::db)?;
         installer::capture_install_version(&store, &skill_id, &central_path);

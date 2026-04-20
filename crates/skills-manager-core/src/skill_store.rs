@@ -35,6 +35,7 @@ pub struct SkillRecord {
     pub update_status: String,
     pub last_checked_at: Option<i64>,
     pub last_check_error: Option<String>,
+    pub description_router: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -75,6 +76,7 @@ pub struct PackRecord {
     pub router_body: Option<String>,
     pub is_essential: bool,
     pub router_updated_at: Option<i64>,
+    pub router_when_to_use: Option<String>,
 }
 
 /// Progressive Disclosure mode for a scenario.
@@ -176,6 +178,13 @@ pub struct ScenarioSkillToolToggleRecord {
     pub updated_at: i64,
 }
 
+/// Result of a bulk description_router update.
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct BulkRouterDescReport {
+    pub updated: usize,
+    pub skipped: usize,
+}
+
 impl SkillStore {
     /// Crate-internal accessor so sibling modules (e.g. version_store) can
     /// share the single Mutex<Connection> without re-opening the database.
@@ -210,9 +219,10 @@ impl SkillStore {
             "INSERT INTO skills (
                 id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                 source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                description_router
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
             params![
                 skill.id,
                 skill.name,
@@ -233,6 +243,7 @@ impl SkillStore {
                 skill.update_status,
                 skill.last_checked_at,
                 skill.last_check_error,
+                skill.description_router,
             ],
         )?;
         Ok(())
@@ -243,7 +254,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills ORDER BY name",
         )?;
         let rows = stmt.query_map([], map_skill_row)?;
@@ -255,7 +267,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], map_skill_row)?;
@@ -267,7 +280,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE central_path = ?1",
         )?;
         let mut rows = stmt.query_map(params![central_path], map_skill_row)?;
@@ -283,7 +297,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills
              WHERE source_type = ?1 AND source_ref = ?2",
         )?;
@@ -315,6 +330,43 @@ impl SkillStore {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn set_skill_description_router(&self, skill_id: &str, text: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn.execute(
+            "UPDATE skills SET description_router = ?2, updated_at = ?3 WHERE id = ?1",
+            params![skill_id, text, chrono::Utc::now().timestamp_millis()],
+        )?;
+        if n == 0 {
+            anyhow::bail!("skill {skill_id} not found");
+        }
+        Ok(())
+    }
+
+    /// Bulk-update `description_router` for multiple skills keyed by name.
+    /// Unknown skill names are counted in `skipped`; all writes run in one transaction.
+    pub fn bulk_set_skill_description_router(
+        &self,
+        updates: &[(String, Option<String>)],
+    ) -> Result<BulkRouterDescReport> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut report = BulkRouterDescReport::default();
+        for (name, text) in updates {
+            let n = tx.execute(
+                "UPDATE skills SET description_router = ?2, updated_at = ?3 WHERE name = ?1",
+                params![name, text, now],
+            )?;
+            if n == 0 {
+                report.skipped += 1;
+            } else {
+                report.updated += n;
+            }
+        }
+        tx.commit()?;
+        Ok(report)
     }
 
     pub fn update_skill_check_state(
@@ -618,7 +670,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, source_type, source_ref, source_ref_resolved, source_subpath,
                     source_branch, source_revision, remote_revision, central_path, content_hash, enabled,
-                    created_at, updated_at, status, update_status, last_checked_at, last_check_error
+                    created_at, updated_at, status, update_status, last_checked_at, last_check_error,
+                    description_router
              FROM skills WHERE name = ?1",
         )?;
         let mut rows = stmt.query_map(params![name], map_skill_row)?;
@@ -953,7 +1006,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM skills s
              INNER JOIN scenario_skills ss ON s.id = ss.skill_id
              WHERE ss.scenario_id = ?1
@@ -1409,7 +1463,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at,
-                    router_description, router_body, is_essential, router_updated_at
+                    router_description, router_body, is_essential, router_updated_at, router_when_to_use
              FROM packs ORDER BY sort_order, created_at",
         )?;
         let rows = stmt.query_map([], map_pack_row)?;
@@ -1420,7 +1474,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, name, description, icon, color, sort_order, created_at, updated_at,
-                    router_description, router_body, is_essential, router_updated_at
+                    router_description, router_body, is_essential, router_updated_at, router_when_to_use
              FROM packs WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], map_pack_row)?;
@@ -1480,6 +1534,18 @@ impl SkillStore {
         Ok(())
     }
 
+    pub fn set_pack_when_to_use(&self, pack_id: &str, text: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn.execute(
+            "UPDATE packs SET router_when_to_use = ?2, updated_at = ?3 WHERE id = ?1",
+            params![pack_id, text, chrono::Utc::now().timestamp_millis()],
+        )?;
+        if n == 0 {
+            anyhow::bail!("pack {pack_id} not found");
+        }
+        Ok(())
+    }
+
     pub fn add_skill_to_pack(&self, pack_id: &str, skill_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let max_order: i32 = conn.query_row(
@@ -1518,7 +1584,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM skills s
              INNER JOIN pack_skills ps ON s.id = ps.skill_id
              WHERE ps.pack_id = ?1
@@ -1555,7 +1622,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.icon, p.color, p.sort_order, p.created_at, p.updated_at,
-                    p.router_description, p.router_body, p.is_essential, p.router_updated_at
+                    p.router_description, p.router_body, p.is_essential, p.router_updated_at, p.router_when_to_use
              FROM packs p
              INNER JOIN scenario_packs sp ON p.id = sp.pack_id
              WHERE sp.scenario_id = ?1
@@ -1718,7 +1785,7 @@ impl SkillStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.icon, p.color, p.sort_order, p.created_at, p.updated_at,
-                    p.router_description, p.router_body, p.is_essential, p.router_updated_at
+                    p.router_description, p.router_body, p.is_essential, p.router_updated_at, p.router_when_to_use
              FROM packs p
              INNER JOIN agent_extra_packs aep ON p.id = aep.pack_id
              WHERE aep.tool_key = ?1
@@ -1751,7 +1818,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM (
                  SELECT ps.skill_id AS id, sp.sort_order * 10000 + ps.sort_order AS effective_order
                  FROM pack_skills ps
@@ -1785,7 +1853,8 @@ impl SkillStore {
         let mut stmt = conn.prepare(
             "SELECT s.id, s.name, s.description, s.source_type, s.source_ref, s.source_ref_resolved, s.source_subpath,
                     s.source_branch, s.source_revision, s.remote_revision, s.central_path, s.content_hash, s.enabled,
-                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error
+                    s.created_at, s.updated_at, s.status, s.update_status, s.last_checked_at, s.last_check_error,
+                    s.description_router
              FROM (
                  SELECT ps.skill_id AS id, sp.sort_order * 10000 + ps.sort_order AS effective_order
                  FROM pack_skills ps
@@ -1992,6 +2061,7 @@ fn map_pack_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PackRecord> {
         router_body: row.get(9)?,
         is_essential: row.get::<_, i64>(10)? != 0,
         router_updated_at: row.get(11)?,
+        router_when_to_use: row.get(12)?,
     })
 }
 
@@ -2016,6 +2086,7 @@ fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord> {
         update_status: row.get(16)?,
         last_checked_at: row.get(17)?,
         last_check_error: row.get(18)?,
+        description_router: row.get(19)?,
     })
 }
 
@@ -2053,6 +2124,7 @@ mod pack_tests {
             update_status: "unknown".to_string(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&rec).unwrap();
         rec
@@ -2571,6 +2643,134 @@ mod pack_tests {
         // base + shared (from scenario), then extra (from extras). Shared appears once.
         assert_eq!(pack_names, vec!["base", "shared", "extra"]);
     }
+
+    #[test]
+    fn pack_record_round_trips_router_when_to_use() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p-x", "pack-x", None, None, None)
+            .unwrap();
+        // Directly write via SQL since set_pack_when_to_use arrives in Task 4.
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE packs SET router_when_to_use = ?1 WHERE id = 'p-x'",
+                ["Trigger when user says X"],
+            )
+            .unwrap();
+        }
+        let packs = store.get_all_packs().unwrap();
+        let px = packs
+            .iter()
+            .find(|p| p.id == "p-x")
+            .expect("pack-x missing");
+        assert_eq!(
+            px.router_when_to_use.as_deref(),
+            Some("Trigger when user says X")
+        );
+    }
+
+    #[test]
+    fn skill_record_round_trips_description_router() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-x", "skill-x");
+        // Directly write via SQL since set_skill_description_router arrives in Task 4.
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE skills SET description_router = ?1 WHERE id = 's-x'",
+                ["Short router line"],
+            )
+            .unwrap();
+        }
+        let all = store.get_all_skills().unwrap();
+        let sx = all.iter().find(|s| s.id == "s-x").expect("s-x missing");
+        assert_eq!(sx.description_router.as_deref(), Some("Short router line"));
+    }
+
+    // ── Task 4: setter tests ──
+
+    #[test]
+    fn set_pack_when_to_use_writes_and_clears() {
+        let (store, _tmp) = test_store();
+        store
+            .insert_pack("p-a", "pack-a", None, None, None)
+            .unwrap();
+
+        store
+            .set_pack_when_to_use("p-a", Some("trigger text"))
+            .unwrap();
+        let p = store.get_pack_by_id("p-a").unwrap().unwrap();
+        assert_eq!(p.router_when_to_use.as_deref(), Some("trigger text"));
+
+        store.set_pack_when_to_use("p-a", None).unwrap();
+        let p = store.get_pack_by_id("p-a").unwrap().unwrap();
+        assert_eq!(p.router_when_to_use, None);
+    }
+
+    #[test]
+    fn set_pack_when_to_use_errors_when_missing() {
+        let (store, _tmp) = test_store();
+        assert!(store.set_pack_when_to_use("p-nope", Some("x")).is_err());
+    }
+
+    #[test]
+    fn set_skill_description_router_writes_and_clears() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-a", "skill-a");
+
+        store
+            .set_skill_description_router("s-a", Some("short"))
+            .unwrap();
+        let s = store.get_skill_by_id("s-a").unwrap().unwrap();
+        assert_eq!(s.description_router.as_deref(), Some("short"));
+
+        store.set_skill_description_router("s-a", None).unwrap();
+        let s = store.get_skill_by_id("s-a").unwrap().unwrap();
+        assert_eq!(s.description_router, None);
+    }
+
+    #[test]
+    fn set_skill_description_router_errors_when_missing() {
+        let (store, _tmp) = test_store();
+        assert!(store
+            .set_skill_description_router("s-nope", Some("x"))
+            .is_err());
+    }
+
+    #[test]
+    fn bulk_set_skill_description_router_atomic() {
+        let (store, _tmp) = test_store();
+        insert_test_skill(&store, "s-a", "skill-a");
+        insert_test_skill(&store, "s-b", "skill-b");
+
+        let updates = vec![
+            ("skill-a".to_string(), Some("A short".to_string())),
+            ("skill-b".to_string(), Some("B short".to_string())),
+            ("skill-missing".to_string(), Some("ignored".to_string())),
+        ];
+        let report = store.bulk_set_skill_description_router(&updates).unwrap();
+        assert_eq!(report.updated, 2);
+        assert_eq!(report.skipped, 1);
+        assert_eq!(
+            store
+                .get_skill_by_id("s-a")
+                .unwrap()
+                .unwrap()
+                .description_router
+                .as_deref(),
+            Some("A short")
+        );
+        assert_eq!(
+            store
+                .get_skill_by_id("s-b")
+                .unwrap()
+                .unwrap()
+                .description_router
+                .as_deref(),
+            Some("B short")
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2852,6 +3052,7 @@ mod agent_tests {
             update_status: "unknown".to_string(),
             last_checked_at: None,
             last_check_error: None,
+            description_router: None,
         };
         store.insert_skill(&rec).unwrap();
         rec

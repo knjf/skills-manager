@@ -330,15 +330,34 @@ pub fn cmd_pack_set_router(
     name: &str,
     description: Option<&str>,
     body_file: Option<&std::path::Path>,
+    when_to_use: Option<&str>,
+    clear_when_to_use: bool,
 ) -> Result<()> {
-    if description.is_none() && body_file.is_none() {
-        anyhow::bail!("set-router requires at least one of --description or --body");
+    if description.is_none() && body_file.is_none() && when_to_use.is_none() && !clear_when_to_use {
+        anyhow::bail!(
+            "set-router requires at least one of --description, --body, --when-to-use, --clear-when-to-use"
+        );
+    }
+    if when_to_use.is_some() && clear_when_to_use {
+        anyhow::bail!("cannot pass both --when-to-use and --clear-when-to-use");
     }
     let store = open_store()?;
     let pack = find_pack_by_name(&store, name)?;
-    let body = body_file.map(std::fs::read_to_string).transpose()?;
     let ts = chrono::Utc::now().timestamp();
-    store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+
+    // description / body path (existing semantics)
+    if description.is_some() || body_file.is_some() {
+        let body = body_file.map(std::fs::read_to_string).transpose()?;
+        store.set_pack_router(&pack.id, description, body.as_deref(), ts)?;
+    }
+
+    // when-to-use path (new)
+    if let Some(w) = when_to_use {
+        store.set_pack_when_to_use(&pack.id, Some(w))?;
+    } else if clear_when_to_use {
+        store.set_pack_when_to_use(&pack.id, None)?;
+    }
+
     println!("Router updated for pack '{}'.", pack.name);
     Ok(())
 }
@@ -1026,5 +1045,45 @@ pub fn cmd_pack_set_essential(name: &str, value: &str) -> Result<()> {
     };
     store.set_pack_essential(&pack.id, essential)?;
     println!("Pack '{}' is_essential set to {}.", pack.name, essential);
+    Ok(())
+}
+
+// ── Skill commands ────────────────────────────────────────
+
+pub fn cmd_skill_set_router_desc(name: &str, description: Option<&str>, clear: bool) -> Result<()> {
+    if description.is_none() && !clear {
+        anyhow::bail!("skill set-router-desc requires --description <text> or --clear");
+    }
+    if description.is_some() && clear {
+        anyhow::bail!("cannot pass both --description and --clear");
+    }
+    let store = open_store()?;
+    let skill = store
+        .get_skill_by_name(name)?
+        .ok_or_else(|| anyhow::anyhow!("skill '{}' not found", name))?;
+    let text = if clear { None } else { description };
+    store.set_skill_description_router(&skill.id, text)?;
+    match text {
+        Some(_) => println!("Router description set for skill '{}'.", skill.name),
+        None => println!("Router description cleared for skill '{}'.", skill.name),
+    }
+    Ok(())
+}
+
+pub fn cmd_skill_import_router_descs(path: &std::path::Path) -> Result<()> {
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let parsed: std::collections::BTreeMap<String, Option<String>> = serde_yaml::from_str(&raw)
+        .with_context(|| format!("failed to parse YAML at {}", path.display()))?;
+    if parsed.is_empty() {
+        anyhow::bail!("no entries in {}", path.display());
+    }
+    let updates: Vec<(String, Option<String>)> = parsed.into_iter().collect();
+    let store = open_store()?;
+    let report = store.bulk_set_skill_description_router(&updates)?;
+    println!(
+        "Updated {} skill(s), skipped {} unknown name(s).",
+        report.updated, report.skipped,
+    );
     Ok(())
 }

@@ -168,6 +168,7 @@ pub async fn import_existing_skill(
             update_status: "local_only".to_string(),
             last_checked_at: Some(now),
             last_check_error: None,
+            description_router: None,
         };
 
         store.insert_skill(&record).map_err(AppError::db)?;
@@ -245,6 +246,7 @@ pub async fn import_all_discovered(store: State<'_, Arc<SkillStore>>) -> Result<
                         update_status: "local_only".to_string(),
                         last_checked_at: Some(now),
                         last_check_error: None,
+                        description_router: None,
                     };
                     if store.insert_skill(&record).is_ok() {
                         installer::capture_install_version(&store, &id, &central_path);

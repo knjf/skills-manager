@@ -1,4 +1,5 @@
 mod commands;
+mod migrate;
 
 use clap::{Parser, Subcommand};
 
@@ -101,6 +102,16 @@ enum Commands {
     Skill {
         #[command(subcommand)]
         action: SkillAction,
+    },
+
+    /// Migrate global sm-* skills into a Claude Code plugin (idempotent)
+    MigrateToPlugin {
+        /// Apply changes (default is dry-run)
+        #[arg(long)]
+        apply: bool,
+        /// Path to the plugin source dir (default: ./claude-plugin from cwd)
+        #[arg(long = "plugin-dir")]
+        plugin_dir: Option<std::path::PathBuf>,
     },
 }
 
@@ -276,6 +287,9 @@ fn main() {
                 commands::cmd_skill_import_router_descs(&file)
             }
         },
+        Commands::MigrateToPlugin { apply, plugin_dir } => {
+            migrate::run(apply, plugin_dir.as_deref())
+        }
     };
 
     if let Err(e) = result {

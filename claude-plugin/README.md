@@ -1,6 +1,6 @@
 # Skills Manager — Claude Code Plugin
 
-Packages the 7 `sm-*` meta-skills (`sm-overview`, `sm-packs`, `sm-skills`, `sm-agents`, `sm-scenarios`, `sm-authoring`, `sm-install`) as a Claude Code plugin so they are loaded **only** in projects where you opt in. `sm-debug` is intentionally kept in the global `~/.claude/skills/` directory with `disable-model-invocation: true` so `/sm-debug` is always available without spending context tokens.
+Packages the eight `sm-*` meta-skills (`sm-overview`, `sm-packs`, `sm-skills`, `sm-agents`, `sm-scenarios`, `sm-authoring`, `sm-install`, `sm-debug`) as a Claude Code plugin so they are loaded **only** in projects where you opt in. A lightweight `sm-router` skill stays in the global `~/.claude/skills/` directory as a permanent entry point — it advertises the toolkit and offers first-aid checks before the user enables the plugin.
 
 The `sm` Rust CLI in `~/.local/bin/sm` is unaffected — it remains callable from every project regardless of plugin state.
 
@@ -16,7 +16,8 @@ claude-plugin/
 │   ├── sm-agents/
 │   ├── sm-scenarios/
 │   ├── sm-authoring/
-│   └── sm-install/
+│   ├── sm-install/
+│   └── sm-debug/
 └── README.md
 ```
 
@@ -58,7 +59,7 @@ Verify with `/context` — the seven `sm-*` skills should appear. Disable again 
 
 - `~/.local/bin/sm` — the Rust CLI (always available)
 - `~/.skills-manager/` — the vault (DB + skill content, single source of truth)
-- `~/.claude/skills/sm-debug/` — emergency debug skill, `disable-model-invocation: true`, manual `/sm-debug` only
+- `~/.claude/skills/sm-router/` — single global skill that advertises the toolkit and runs first-aid checks before pointing the user at the plugin
 
 ## Migration helper
 

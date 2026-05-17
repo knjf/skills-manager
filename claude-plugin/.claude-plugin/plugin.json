@@ -1,5 +1,5 @@
 {
   "name": "sm",
-  "description": "Skills Manager meta-skills (sm-overview, sm-packs, sm-skills, sm-agents, sm-scenarios, sm-authoring, sm-install). Enable per-project when you need to manage skills with the sm CLI.",
+  "description": "Skills Manager meta-skills (sm-overview, sm-packs, sm-skills, sm-agents, sm-scenarios, sm-authoring, sm-install, sm-debug). Enable per-project when you need to manage skills with the sm CLI. The lightweight sm-router skill stays globally available as the entry point.",
   "version": "0.1.0"
 }

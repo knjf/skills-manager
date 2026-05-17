@@ -62,4 +62,10 @@ Verify with `/context` — the seven `sm-*` skills should appear. Disable again 
 
 ## Migration helper
 
-A future `sm migrate-to-plugin` subcommand will automate marketplace creation + global cleanup. For now, follow the manual steps in this README.
+Run `sm migrate-to-plugin` from the repo root for an idempotent dry-run, then `sm migrate-to-plugin --apply` to execute. The command:
+
+1. Creates `~/.claude/marketplaces/sm-local/.claude-plugin/marketplace.json` (if missing)
+2. Symlinks `~/.claude/marketplaces/sm-local/sm-plugin -> <repo>/claude-plugin` (if missing)
+3. Moves any pre-existing `~/.claude/skills/sm-*` symlinks (except `sm-debug`) into `~/.claude/skills/_backup-YYYYMMDD/`
+
+After it finishes, run the printed `claude plugin marketplace add` / `install` / `disable --scope user` commands. Re-running the migration is safe — it skips already-completed steps.

@@ -4,7 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Skills the migration moves into the plugin.
-/// `sm-debug` is intentionally excluded so it remains globally available.
+/// `sm-router` is intentionally excluded — it stays globally available as
+/// the entry point that advertises the toolkit and runs first-aid checks.
 const PLUGIN_SKILLS: &[&str] = &[
     "sm-overview",
     "sm-packs",
@@ -13,6 +14,7 @@ const PLUGIN_SKILLS: &[&str] = &[
     "sm-scenarios",
     "sm-authoring",
     "sm-install",
+    "sm-debug",
 ];
 
 const MARKETPLACE_REL: &str = ".claude/marketplaces/sm-local";
@@ -237,8 +239,8 @@ mod tests {
         for s in PLUGIN_SKILLS {
             symlink("/nonexistent", claude_skills.join(s)).unwrap();
         }
-        // sm-debug must NOT be moved
-        symlink("/nonexistent", claude_skills.join("sm-debug")).unwrap();
+        // sm-router must NOT be moved
+        symlink("/nonexistent", claude_skills.join("sm-router")).unwrap();
 
         let backup = claude_skills.join("_backup-test");
         let plan = build_plan(&plugin_src, &marketplace, &claude_skills, &backup);
@@ -252,8 +254,8 @@ mod tests {
                 Action::CreatePluginSymlink { .. } => has_symlink = true,
                 Action::BackupSkill { from, .. } => {
                     assert!(
-                        !from.ends_with("sm-debug"),
-                        "sm-debug must not be backed up"
+                        !from.ends_with("sm-router"),
+                        "sm-router must not be backed up"
                     );
                     backup_count += 1;
                 }

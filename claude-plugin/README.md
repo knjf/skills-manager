@@ -22,6 +22,13 @@ claude-plugin/
 
 The `skills/` entries are symlinks back to the vault (`~/.skills-manager/skills/sm-*`), so the vault remains the single source of truth — edits via `sm skill set-router …` propagate immediately.
 
+## marketplace.json gotchas
+
+Two non-obvious rules from the Claude Code marketplace schema (`https://json.schemastore.org/claude-code-marketplace.json`):
+
+1. `plugins[].source` accepts **either** a relative path string (`"./sm-plugin"`) **or** an object whose discriminator is `source` (not `type`) — valid values: `npm`, `url`, `github`, `git-subdir`. There is **no `local` object form** and absolute paths are rejected.
+2. Relative paths are resolved against the marketplace **directory** (e.g. `~/.claude/marketplaces/sm-local/`), not the `.claude-plugin/marketplace.json` file. So `"./sm-plugin"` resolves to `~/.claude/marketplaces/sm-local/sm-plugin`, which is the symlink to the in-repo `claude-plugin/`.
+
 ## One-time install
 
 ```bash

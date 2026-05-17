@@ -1,0 +1,5 @@
+{
+  "name": "sm",
+  "description": "Skills Manager meta-skills (sm-overview, sm-packs, sm-skills, sm-agents, sm-scenarios, sm-authoring, sm-install). Enable per-project when you need to manage skills with the sm CLI.",
+  "version": "0.1.0"
+}

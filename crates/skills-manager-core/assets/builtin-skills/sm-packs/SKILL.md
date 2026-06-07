@@ -72,12 +72,29 @@ sm pack set-essential <pack-name> true
 sm pack set-essential <pack-name> false
 ```
 
-## Add / remove skill ↔ pack
+## Add / remove pack ↔ scenario
+
+The current CLI `pack add/remove` commands attach a **pack to a scenario** (not an individual skill to a pack):
 
 ```bash
-sm pack add <pack-name> <skill-name>
-sm pack remove <pack-name> <skill-name>
+sm pack add <pack-name> <scenario-name>
+sm pack remove <pack-name> <scenario-name>
 ```
+
+Examples:
+```bash
+sm pack add marketing full-dev
+sm pack remove marketing minimal
+```
+
+Before using a mutating command, prefer checking the live syntax:
+
+```bash
+sm pack add --help
+sm pack remove --help
+```
+
+As of the current CLI, there is no first-class `sm pack add-skill` command in `sm --help`; if a task needs to add a skill to a pack, inspect the app/source or DB schema first instead of guessing.
 
 ## Related
 

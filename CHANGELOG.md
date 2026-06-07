@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-06-07
+
+### Added
+- Three-Tier Progressive Disclosure (L1/L2/L3) with `hybrid` disclosure mode, pack routers, and an in-app editing UI — non-essential skills stay in the vault and are read on demand to save context tokens
+- Skills Manager skills pack (`sm-*`, 8 built-in meta-skills) packaged as a Claude Code plugin, with `sm migrate-to-plugin` for local marketplace bootstrap
+- Per-agent scenario assignment — assign different scenarios per agent and attach extra packs (AgentDetail page, sidebar AGENTS section, `sm agents`/`sm agent` CLI)
+- Skill deduplication against the central store (`sm dedup`, Import/Mark Native/Dedup actions) and skill version history
+- Hermes built-in tool adapter
+- `sm-router` entry point replacing the global `sm-debug`
+
+### Changed
+- `sm scenario set-mode` now re-syncs the active scenario immediately
+- Native skills are preserved during sync — managed skills are added alongside, never overwriting a pre-existing native skill of the same name
+- Dashboard redesigned with per-agent overview and quick stats
+
+### Fixed
+- Legacy `custom_tools` rows for keys that became built-ins are now treated as a path override instead of duplicating the adapter
+- Cursor now uses symlink sync like all other agents
+
 ## [1.13.3] - 2026-04-11
 
 ### Changed

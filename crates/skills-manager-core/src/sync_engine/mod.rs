@@ -763,6 +763,89 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn reconcile_leaves_native_skill_and_adds_managed_alongside() {
+        use std::collections::HashSet;
+        let tmp = tempdir().unwrap();
+        let agent_dir = tmp.path().join("agent");
+        fs::create_dir_all(&agent_dir).unwrap();
+        let vault_root = sm_vault(tmp.path());
+        stub_skill_dir(&vault_root, "alpha");
+
+        // Pre-existing native: plain dir in agent_dir, not a symlink, no router marker.
+        let native = agent_dir.join("native-skill");
+        fs::create_dir_all(&native).unwrap();
+        fs::write(native.join("SKILL.md"), "i was here first").unwrap();
+
+        let p = tpack("ess", true, None);
+        let sk = vec![tskill("alpha")];
+        let packs = vec![PackWithSkills {
+            pack: &p,
+            skills: &sk,
+        }];
+
+        let excluded: HashSet<String> = HashSet::new();
+        let report = reconcile_agent_dir(
+            &agent_dir,
+            &packs,
+            DisclosureMode::Full,
+            &vault_root,
+            &excluded,
+        )
+        .unwrap();
+
+        assert!(agent_dir.join("alpha").exists(), "managed skill added");
+        assert!(
+            agent_dir.join("native-skill").exists(),
+            "native skill untouched"
+        );
+        assert_eq!(report.removed, 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reconcile_does_not_overwrite_native_when_names_collide() {
+        use std::collections::HashSet;
+        let tmp = tempdir().unwrap();
+        let agent_dir = tmp.path().join("agent");
+        fs::create_dir_all(&agent_dir).unwrap();
+        let vault_root = sm_vault(tmp.path());
+        stub_skill_dir(&vault_root, "research");
+
+        // Native with same name as a managed skill: native wins, sync must skip.
+        let native = agent_dir.join("research");
+        fs::create_dir_all(&native).unwrap();
+        fs::write(native.join("SKILL.md"), "native body").unwrap();
+
+        let p = tpack("ess", true, None);
+        let sk = vec![tskill("research")];
+        let packs = vec![PackWithSkills {
+            pack: &p,
+            skills: &sk,
+        }];
+
+        let excluded: HashSet<String> = HashSet::new();
+        reconcile_agent_dir(
+            &agent_dir,
+            &packs,
+            DisclosureMode::Full,
+            &vault_root,
+            &excluded,
+        )
+        .unwrap();
+
+        let meta = std::fs::symlink_metadata(agent_dir.join("research")).unwrap();
+        assert!(
+            !meta.file_type().is_symlink(),
+            "native dir must not be replaced by symlink"
+        );
+        assert_eq!(
+            fs::read_to_string(agent_dir.join("research/SKILL.md")).unwrap(),
+            "native body"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn unreconcile_removes_routers_and_symlinks_but_leaves_native() {
         let tmp = tempdir().unwrap();
         let agent_dir = tmp.path().join("agent");

@@ -211,6 +211,15 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             is_custom: false,
         },
         ToolAdapter {
+            key: "hermes".into(),
+            display_name: "Hermes".into(),
+            relative_skills_dir: ".hermes/skills".into(),
+            relative_detect_dir: ".hermes".into(),
+            additional_scan_dirs: vec![],
+            override_skills_dir: None,
+            is_custom: false,
+        },
+        ToolAdapter {
             key: "droid".into(),
             display_name: "Droid".into(),
             relative_skills_dir: ".factory/skills".into(),
@@ -536,7 +545,17 @@ pub fn all_tool_adapters(store: &crate::skill_store::SkillStore) -> Vec<ToolAdap
         })
         .collect();
 
+    let builtin_keys: std::collections::HashSet<String> =
+        adapters.iter().map(|a| a.key.clone()).collect();
     for ct in customs {
+        if builtin_keys.contains(&ct.key) {
+            // Legacy custom_tools rows for keys that later became built-ins:
+            // treat the skills_dir as a path override rather than duplicating.
+            if let Some(a) = adapters.iter_mut().find(|a| a.key == ct.key) {
+                a.override_skills_dir = Some(ct.skills_dir.clone());
+            }
+            continue;
+        }
         adapters.push(ToolAdapter {
             key: ct.key,
             display_name: ct.display_name,
@@ -564,6 +583,9 @@ pub fn find_adapter_with_store(
     if let Some(mut adapter) = default_tool_adapters().into_iter().find(|a| a.key == key) {
         if let Some(path) = custom_tool_paths(store).get(key) {
             adapter.override_skills_dir = Some(path.clone());
+        } else if let Some(ct) = custom_tools(store).into_iter().find(|ct| ct.key == key) {
+            // Honor legacy custom_tools row as a path override on the built-in.
+            adapter.override_skills_dir = Some(ct.skills_dir);
         }
         return Some(adapter);
     }

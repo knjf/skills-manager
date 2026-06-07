@@ -1053,6 +1053,9 @@ pub fn cmd_scenario_set_mode(name: &str, mode: &str) -> Result<()> {
         "Scenario '{}' disclosure mode set to '{}'.",
         scenario.name, mode
     );
+
+    resync_if_active(&store, &scenario.id)?;
+
     Ok(())
 }
 

@@ -656,7 +656,7 @@ mod tests {
         let err = run_migrations(&conn).unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains("newer than this app supports"),
+            msg.contains("newer than this binary supports"),
             "unexpected error: {msg}"
         );
     }
